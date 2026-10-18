@@ -54,6 +54,7 @@
           <input id="file-input" type="file" accept="image/*" multiple>
           <span>+ Aggiungi foto</span>
         </label>
+        <p id="ai-status" class="hint"></p>
       </div>
 
       <div class="filter-row">
@@ -89,6 +90,26 @@
           <button class="primary" type="submit">Salva profilo</button>
           <span id="profile-saved" class="saved hidden">Salvato ✓</span>
         </form>
+      </div>
+
+      <div class="card">
+        <h2>Riconoscimento AI (Gemini)</h2>
+        <p class="hint">Con una chiave API di Gemini, ogni foto caricata viene analizzata in automatico: nome, categoria, stile, stagione e colore vengono compilati per te. Puoi creare una chiave gratuita su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</p>
+        <form id="ai-form">
+          <label>Chiave API
+            <input name="key" type="password" autocomplete="off" placeholder="AIza…">
+          </label>
+          <label>Modello
+            <select name="model"></select>
+          </label>
+          <label class="inline"><input name="enabled" type="checkbox"> Analizza automaticamente le nuove foto</label>
+          <div class="row">
+            <button class="primary" type="submit">Salva e verifica</button>
+            <button class="secondary" type="button" id="btn-ai-remove">Rimuovi chiave</button>
+          </div>
+          <p id="ai-check" class="hint"></p>
+        </form>
+        <p class="hint">La chiave resta salvata solo in questo browser e le foto vengono inviate direttamente a Google per l'analisi. Non è inclusa nei backup.</p>
       </div>
 
       <div class="card">
@@ -130,6 +151,7 @@
       </div>
       <div class="dialog-actions">
         <button type="button" id="btn-delete-item" class="danger">Elimina</button>
+        <button type="button" id="btn-ai-item" class="secondary">✨ Analizza con AI</button>
         <span class="spacer"></span>
         <button type="button" id="btn-cancel-item" class="secondary">Annulla</button>
         <button type="submit" class="primary">Salva</button>
@@ -142,6 +164,7 @@
   <script src="js/db.js"></script>
   <script src="js/colors.js"></script>
   <script src="js/data.js"></script>
+  <script src="js/ai.js"></script>
   <script src="js/generator.js"></script>
   <script src="js/app.js"></script>
 </body>

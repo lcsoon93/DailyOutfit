@@ -99,17 +99,36 @@
     }
   }
 
+  // Ogni foto viene preparata (e analizzata con l'AI, se attiva) e messa in coda:
+  // l'utente può già rivedere la prima mentre le altre vengono elaborate.
   $('#file-input').addEventListener('change', async (e) => {
     const files = [...e.target.files];
     e.target.value = '';
-    for (const f of files) {
+    const status = $('#ai-status');
+    let aiFailed = false;
+    for (const [n, f] of files.entries()) {
+      let item;
       try {
-        state.queue.push(await fileToItem(f));
+        item = await fileToItem(f);
       } catch {
         toast(`Impossibile leggere ${f.name}`);
+        continue;
       }
+      if (AI.enabled() && !aiFailed) {
+        status.textContent = `✨ Analisi con AI ${n + 1}/${files.length}…`;
+        try {
+          const r = await AI.analyze(item.image);
+          AI.apply(item, r);
+          if (!r.isClothing) toast(`${f.name}: non sembra un capo d'abbigliamento`);
+        } catch (err) {
+          aiFailed = true;
+          toast(`Analisi AI non riuscita: ${err.message}`);
+        }
+      }
+      state.queue.push(item);
+      if (!dialog.open) nextInQueue();
     }
-    nextInQueue();
+    status.textContent = '';
   });
 
   function nextInQueue() {
@@ -163,15 +182,38 @@
   function openEditor(item) {
     state.editing = item;
     $('#item-preview').src = item.image;
+    fillForm(item);
+    $('#btn-delete-item').textContent = item.isNew ? 'Scarta' : 'Elimina';
+    $('#btn-ai-item').classList.toggle('hidden', !AI.settings().key);
+    dialog.showModal();
+  }
+
+  function fillForm(item) {
     form.name.value = item.name || '';
     form.category.value = item.category;
     form.querySelectorAll('[name=styles]').forEach((c) => { c.checked = item.styles.includes(c.value); });
     form.querySelectorAll('[name=seasons]').forEach((c) => { c.checked = item.seasons.includes(c.value); });
     form.color.value = item.color;
     $('#color-name').textContent = Colors.nearest(item.color).name;
-    $('#btn-delete-item').textContent = item.isNew ? 'Scarta' : 'Elimina';
-    dialog.showModal();
   }
+
+  $('#btn-ai-item').addEventListener('click', async () => {
+    const btn = $('#btn-ai-item');
+    const item = state.editing;
+    btn.disabled = true;
+    btn.textContent = 'Analisi…';
+    try {
+      const r = await AI.analyze(item.image);
+      // compila solo il modulo: il capo cambia davvero quando l'utente salva
+      fillForm(AI.apply({ ...item, styles: [...item.styles], seasons: [...item.seasons] }, r));
+      if (!r.isClothing) toast('La foto non sembra un capo d\'abbigliamento');
+    } catch (err) {
+      toast(`Analisi AI non riuscita: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '✨ Analizza con AI';
+    }
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -343,6 +385,48 @@
     }
   }
 
+  // ---------- impostazioni AI ----------
+  const aiForm = $('#ai-form');
+  function setModels(models, selected) {
+    aiForm.model.innerHTML = '';
+    const ids = models.length ? models : [{ id: selected, label: selected }];
+    if (!ids.some((m) => m.id === selected)) ids.unshift({ id: selected, label: selected });
+    for (const m of ids) aiForm.model.append(el('option', { value: m.id, text: m.label === m.id ? m.id : `${m.label} (${m.id})` }));
+    aiForm.model.value = selected;
+  }
+  function fillAi() {
+    const s = AI.settings();
+    aiForm.key.value = s.key || '';
+    aiForm.enabled.checked = s.enabled !== false;
+    setModels([], s.model || AI.DEFAULT_MODEL);
+  }
+  aiForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const check = $('#ai-check');
+    const key = aiForm.key.value.trim();
+    const settings = { key, model: aiForm.model.value || AI.DEFAULT_MODEL, enabled: aiForm.enabled.checked };
+    AI.save(settings);
+    if (!key) { check.textContent = 'Nessuna chiave inserita: il riconoscimento AI è disattivato.'; return; }
+    check.className = 'hint';
+    check.textContent = 'Verifico la chiave…';
+    try {
+      const models = await AI.listModels(key);
+      setModels(models, settings.model);
+      check.className = 'hint ok';
+      check.textContent = `Chiave valida ✓ (${models.length} modelli disponibili)`;
+    } catch (err) {
+      check.className = 'hint err';
+      check.textContent = `Errore: ${err.message}`;
+    }
+  });
+  aiForm.model.addEventListener('change', () => AI.save({ ...AI.settings(), model: aiForm.model.value }));
+  $('#btn-ai-remove').addEventListener('click', () => {
+    AI.save({ key: '', model: AI.settings().model, enabled: true });
+    fillAi();
+    $('#ai-check').className = 'hint';
+    $('#ai-check').textContent = 'Chiave rimossa.';
+  });
+
   // ---------- backup ----------
   $('#btn-export').addEventListener('click', () => {
     const data = { version: 1, profile: state.profile, items: state.items, favorites: state.favorites };
@@ -379,6 +463,7 @@
     state.items = await DB.all('items');
     state.favorites = await DB.all('favorites');
     fillProfile();
+    fillAi();
     renderWardrobe();
     renderOutfitControls();
     renderFavorites();
