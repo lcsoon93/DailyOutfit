@@ -307,6 +307,7 @@
       state.current = null;
       $('#outfit-title').textContent = 'Non riesco a comporre un outfit';
       $('#outfit-items').innerHTML = '';
+      $('#outfit-render').classList.add('hidden');
       $('#outfit-notes').innerHTML = '';
       $('#outfit-notes').append(el('p', { class: 'warn', text: res.error }));
       $('#btn-save').disabled = true;
@@ -314,11 +315,15 @@
       return;
     }
     state.current = res;
+    $('#outfit-render').classList.remove('hidden');
     Store.set('recent', [...res.items.map((i) => i.id), ...recentIds].slice(0, 12));
     $('#btn-save').disabled = false;
     $('#btn-regenerate').disabled = false;
     $('#outfit-title').textContent = `Outfit per: ${occName(res.occasion)}`;
     renderOutfitItems($('#outfit-items'), res.items);
+    Render.collage(res.items, $('#collage-canvas'));
+    resetIllustration();
+    setRenderMode(state.renderMode === 'ai' ? 'collage' : state.renderMode);
     const notes = $('#outfit-notes');
     notes.innerHTML = '';
     notes.append(el('ul', {}, res.notes.map((n) => el('li', { text: n }))));
@@ -337,6 +342,71 @@
       ]));
     }
   }
+
+  // ---------- render 2D ----------
+  state.renderMode = 'collage';
+  function setRenderMode(mode) {
+    state.renderMode = mode;
+    document.querySelectorAll('.seg').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+    $('#collage-canvas').classList.toggle('hidden', mode !== 'collage');
+    $('#ai-render').classList.toggle('hidden', mode !== 'ai');
+    $('#outfit-items').classList.toggle('hidden', mode !== 'items');
+    const hasAi = Boolean(state.current && state.current.illustration);
+    $('#btn-download').classList.toggle('hidden', mode === 'items' || (mode === 'ai' && !hasAi));
+    $('#btn-reillustrate').classList.toggle('hidden', mode !== 'ai' || !hasAi);
+    if (mode === 'ai' && !AI.settings().key) {
+      $('#ai-render-msg').innerHTML = 'Per le illustrazioni serve la chiave API di Gemini: inseriscila nel <a href="#" data-go="profile">profilo</a>.';
+      $('#btn-illustrate').classList.add('hidden');
+    } else if (mode === 'ai' && !hasAi) {
+      $('#ai-render-msg').textContent = 'Genera un\'illustrazione 2D di una figura che indossa questo outfit, partendo dalle foto dei tuoi capi.';
+      $('#btn-illustrate').classList.remove('hidden');
+    }
+  }
+  document.querySelectorAll('.seg').forEach((b) => b.addEventListener('click', () => setRenderMode(b.dataset.mode)));
+
+  function resetIllustration() {
+    $('#ai-image').classList.add('hidden');
+    $('#ai-image').removeAttribute('src');
+    $('#ai-placeholder').classList.remove('hidden', 'loading');
+  }
+
+  async function illustrate() {
+    const outfit = state.current;
+    if (!outfit) return;
+    const ph = $('#ai-placeholder');
+    resetIllustration();
+    outfit.illustration = null;
+    setRenderMode('ai');
+    ph.classList.add('loading');
+    $('#ai-render-msg').textContent = 'Sto disegnando il tuo outfit… può richiedere qualche secondo.';
+    try {
+      const url = await AI.illustrate(outfit.items, state.profile);
+      if (state.current !== outfit) return; // nel frattempo è stato generato un altro outfit
+      outfit.illustration = url;
+      $('#ai-image').src = url;
+      $('#ai-image').classList.remove('hidden');
+      ph.classList.add('hidden');
+    } catch (err) {
+      if (state.current !== outfit) return;
+      $('#ai-render-msg').textContent = `Illustrazione non riuscita: ${err.message}`;
+    } finally {
+      ph.classList.remove('loading');
+      if (state.current === outfit) setRenderMode(state.renderMode);
+    }
+  }
+  $('#btn-illustrate').addEventListener('click', illustrate);
+  $('#btn-reillustrate').addEventListener('click', illustrate);
+
+  $('#btn-download').addEventListener('click', () => {
+    if (!state.current) return;
+    const ai = state.renderMode === 'ai' && state.current.illustration;
+    const href = ai ? state.current.illustration : $('#collage-canvas').toDataURL('image/png');
+    const ext = ai ? (href.match(/^data:image\/(\w+)/) || [, 'png'])[1].replace('jpeg', 'jpg') : 'png';
+    const a = el('a', { href, download: `outfit-${state.current.occasion.id}-${new Date().toISOString().slice(0, 10)}.${ext}` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+  });
 
   $('#btn-generate').addEventListener('click', generate);
   $('#btn-regenerate').addEventListener('click', generate);
@@ -366,6 +436,8 @@
       const occ = OCCASIONS.find((o) => o.id === f.occasion);
       const grid = el('div', { class: 'outfit-grid compact' });
       renderOutfitItems(grid, items);
+      const thumb = el('canvas', { class: 'fav-collage' });
+      if (items.length) Render.collage(items, thumb);
       list.append(el('div', { class: 'card' }, [
         el('div', { class: 'result-head' }, [
           el('h3', { text: `${occ ? occ.label : f.occasion} · ${labelOf(WEATHER, f.weather)}` }),
@@ -380,6 +452,7 @@
           }),
         ]),
         items.length < f.itemIds.length ? el('p', { class: 'hint', text: 'Alcuni capi sono stati eliminati dall\'armadio.' }) : null,
+        items.length ? thumb : null,
         grid,
       ]));
     }
@@ -387,41 +460,53 @@
 
   // ---------- impostazioni AI ----------
   const aiForm = $('#ai-form');
-  function setModels(models, selected) {
-    aiForm.model.innerHTML = '';
-    const ids = models.length ? models : [{ id: selected, label: selected }];
+  function setModels(select, models, selected) {
+    select.innerHTML = '';
+    const ids = models.length ? [...models] : [{ id: selected, label: selected }];
     if (!ids.some((m) => m.id === selected)) ids.unshift({ id: selected, label: selected });
-    for (const m of ids) aiForm.model.append(el('option', { value: m.id, text: m.label === m.id ? m.id : `${m.label} (${m.id})` }));
-    aiForm.model.value = selected;
+    for (const m of ids) select.append(el('option', { value: m.id, text: m.label === m.id ? m.id : `${m.label} (${m.id})` }));
+    select.value = selected;
   }
   function fillAi() {
     const s = AI.settings();
     aiForm.key.value = s.key || '';
     aiForm.enabled.checked = s.enabled !== false;
-    setModels([], s.model || AI.DEFAULT_MODEL);
+    setModels(aiForm.model, [], s.model || AI.DEFAULT_MODEL);
+    setModels(aiForm.imageModel, [], s.imageModel || AI.DEFAULT_IMAGE_MODEL);
   }
+  const aiFormSettings = (key) => ({
+    key,
+    model: aiForm.model.value || AI.DEFAULT_MODEL,
+    imageModel: aiForm.imageModel.value || AI.DEFAULT_IMAGE_MODEL,
+    enabled: aiForm.enabled.checked,
+  });
   aiForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const check = $('#ai-check');
     const key = aiForm.key.value.trim();
-    const settings = { key, model: aiForm.model.value || AI.DEFAULT_MODEL, enabled: aiForm.enabled.checked };
+    const settings = aiFormSettings(key);
     AI.save(settings);
     if (!key) { check.textContent = 'Nessuna chiave inserita: il riconoscimento AI è disattivato.'; return; }
     check.className = 'hint';
     check.textContent = 'Verifico la chiave…';
     try {
-      const models = await AI.listModels(key);
-      setModels(models, settings.model);
+      const { models, imageModels } = await AI.listModels(key);
+      setModels(aiForm.model, models, settings.model);
+      // se il modello immagine predefinito non c'è, scegline uno disponibile
+      const imageModel = imageModels.some((m) => m.id === settings.imageModel) || !imageModels.length ? settings.imageModel : imageModels[0].id;
+      setModels(aiForm.imageModel, imageModels, imageModel);
+      AI.save(aiFormSettings(key));
       check.className = 'hint ok';
-      check.textContent = `Chiave valida ✓ (${models.length} modelli disponibili)`;
+      check.textContent = `Chiave valida ✓ (${models.length} modelli di testo, ${imageModels.length} per immagini)`;
     } catch (err) {
       check.className = 'hint err';
       check.textContent = `Errore: ${err.message}`;
     }
   });
   aiForm.model.addEventListener('change', () => AI.save({ ...AI.settings(), model: aiForm.model.value }));
+  aiForm.imageModel.addEventListener('change', () => AI.save({ ...AI.settings(), imageModel: aiForm.imageModel.value }));
   $('#btn-ai-remove').addEventListener('click', () => {
-    AI.save({ key: '', model: AI.settings().model, enabled: true });
+    AI.save({ ...AI.settings(), key: '', enabled: true });
     fillAi();
     $('#ai-check').className = 'hint';
     $('#ai-check').textContent = 'Chiave rimossa.';

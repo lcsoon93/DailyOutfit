@@ -193,6 +193,22 @@ input[type=color] { width: 48px; height: 36px; border: 1px solid var(--border); 
 .notes li { margin-bottom: 4px; }
 .warn { color: var(--danger); margin: 0; }
 
+/* render 2D */
+.render { margin-bottom: 8px; }
+.segmented { display: flex; gap: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 4px; width: fit-content; max-width: 100%; margin: 0 auto 14px; overflow-x: auto; }
+.seg { border: 0; background: none; color: var(--muted); padding: 6px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.seg.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow); }
+.render-stage { display: flex; justify-content: center; }
+.render-stage > * { width: 100%; }
+.render-image { display: block; width: 100%; max-width: 420px; height: auto; margin: 0 auto; border-radius: var(--radius); }
+#ai-render { max-width: 420px; }
+.ai-placeholder { aspect-ratio: 4 / 5; border: 2px dashed var(--border); border-radius: var(--radius); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; color: var(--muted); }
+.ai-placeholder.loading button { display: none; }
+.ai-placeholder.loading p::after { content: ''; display: block; width: 28px; height: 28px; margin: 16px auto 0; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.row.center { justify-content: center; }
+.fav-collage { display: block; width: 100%; max-width: 220px; border-radius: 12px; margin-bottom: 10px; }
+
 /* dialog */
 dialog {
   border: 0;

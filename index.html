@@ -40,7 +40,28 @@
             <button id="btn-save" class="secondary">♥ Salva</button>
           </div>
         </div>
-        <div id="outfit-items" class="outfit-grid"></div>
+        <div id="outfit-render" class="render">
+          <div class="segmented" role="tablist">
+            <button class="seg active" data-mode="collage">Collage</button>
+            <button class="seg" data-mode="ai">✨ Illustrazione AI</button>
+            <button class="seg" data-mode="items">Capi</button>
+          </div>
+          <div class="render-stage">
+            <canvas id="collage-canvas" class="render-image" aria-label="Collage dell'outfit"></canvas>
+            <div id="ai-render" class="hidden">
+              <img id="ai-image" class="render-image hidden" alt="Illustrazione dell'outfit generata con AI">
+              <div id="ai-placeholder" class="ai-placeholder">
+                <p id="ai-render-msg">Genera un'illustrazione 2D di una figura che indossa questo outfit, partendo dalle foto dei tuoi capi.</p>
+                <button id="btn-illustrate" class="primary">✨ Genera illustrazione</button>
+              </div>
+            </div>
+            <div id="outfit-items" class="outfit-grid hidden"></div>
+          </div>
+          <div class="row center">
+            <button id="btn-download" class="secondary">⬇ Scarica immagine</button>
+            <button id="btn-reillustrate" class="secondary hidden">↻ Rigenera illustrazione</button>
+          </div>
+        </div>
         <div id="outfit-notes" class="notes"></div>
       </div>
     </section>
@@ -99,8 +120,11 @@
           <label>Chiave API
             <input name="key" type="password" autocomplete="off" placeholder="AIza…">
           </label>
-          <label>Modello
+          <label>Modello per il riconoscimento
             <select name="model"></select>
+          </label>
+          <label>Modello per le illustrazioni
+            <select name="imageModel"></select>
           </label>
           <label class="inline"><input name="enabled" type="checkbox"> Analizza automaticamente le nuove foto</label>
           <div class="row">
@@ -166,6 +190,7 @@
   <script src="js/data.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/generator.js"></script>
+  <script src="js/render.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

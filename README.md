@@ -8,10 +8,13 @@ App web che, dopo aver caricato le foto dei tuoi vestiti e indicato sesso ed et�
 2. **Armadio**: carica le foto dei capi (meglio su sfondo neutro). Per ogni capo scegli categoria, stile (sportivo, casual, smart, elegante) e stagione; il colore viene riconosciuto in automatico dalla foto e si può correggere.
    Con il riconoscimento AI attivo (vedi sotto) questi campi vengono compilati da Gemini e tu devi solo confermare.
 3. **Outfit**: scegli l'occasione e il meteo, poi premi *Genera outfit*. *Un altro* propone un'alternativa, *Salva* lo aggiunge ai preferiti.
+4. **Render 2D**: ogni outfit viene mostrato come collage "flat lay" con i capi ritagliati dallo sfondo (si scarica in PNG). Con la chiave Gemini, *✨ Illustrazione AI* genera un figurino di una persona che indossa l'outfit, a partire dalle foto dei capi.
 
 ## Riconoscimento AI con Gemini
 
 In *Profilo → Riconoscimento AI* inserisci una chiave API di Gemini (si crea gratis su [Google AI Studio](https://aistudio.google.com/apikey)) e premi *Salva e verifica*: la chiave viene controllata e il menu *Modello* si riempie con i modelli disponibili per il tuo account (predefinito `gemini-3.5-flash-lite`, veloce ed economico).
+
+Il secondo menu sceglie il modello per le illustrazioni (predefinito `gemini-3.1-flash-lite-image`, il più economico; `gemini-nano-banana-2.1` dà risultati migliori). La generazione di immagini potrebbe non rientrare nel piano gratuito: controlla i prezzi su Google AI Studio.
 
 Da quel momento ogni foto caricata viene inviata a Gemini, che restituisce nome, categoria, stili, stagioni e colore; nella scheda di un capo il pulsante *✨ Analizza con AI* ripete l'analisi.
 
@@ -44,5 +47,6 @@ js/colors.js      riconoscimento colore e regole di abbinamento
 js/ai.js          riconoscimento dei capi con Gemini
 js/data.js        categorie, stili, stagioni, occasioni, meteo
 js/generator.js   motore di generazione degli outfit
+js/render.js      collage 2D dell'outfit con ritaglio dello sfondo
 js/app.js         logica dell'interfaccia
 ```

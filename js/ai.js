@@ -3,6 +3,7 @@
 const AI = (() => {
   const BASE = 'https://generativelanguage.googleapis.com/v1beta';
   const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
+  const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-lite-image';
 
   const settings = () => Store.get('ai', { key: '', model: DEFAULT_MODEL, enabled: true });
   const enabled = () => { const s = settings(); return Boolean(s.key && s.enabled); };
@@ -44,31 +45,31 @@ const AI = (() => {
     return data;
   }
 
-  // Modelli disponibili per la chiave, che accettano generateContent.
+  // Modelli disponibili per la chiave, che accettano generateContent,
+  // divisi tra modelli di testo/visione e modelli che generano immagini.
   async function listModels(key) {
-    const models = [];
+    const models = [], imageModels = [];
     let pageToken = '';
     do {
       const data = await request(`/models?pageSize=200${pageToken ? '&pageToken=' + pageToken : ''}`, { key });
       for (const m of data.models || []) {
         const id = m.name.replace(/^models\//, '');
-        if ((m.supportedGenerationMethods || []).includes('generateContent') && /gemini/.test(id) && !/embedding|tts|image|audio|live/.test(id)) {
-          models.push({ id, label: m.displayName || id });
-        }
+        if (!(m.supportedGenerationMethods || []).includes('generateContent') || !/gemini/.test(id)) continue;
+        if (/image|banana/.test(id)) imageModels.push({ id, label: m.displayName || id });
+        else if (!/embedding|tts|audio|live/.test(id)) models.push({ id, label: m.displayName || id });
       }
       pageToken = data.nextPageToken || '';
     } while (pageToken);
-    return models;
+    return { models, imageModels };
   }
 
   async function analyze(dataUrl) {
     const { key, model } = settings();
-    const [, mime, b64] = dataUrl.match(/^data:([^;]+);base64,(.*)$/) || [];
     const data = await request(`/models/${encodeURIComponent(model || DEFAULT_MODEL)}:generateContent`, {
       key,
       method: 'POST',
       body: {
-        contents: [{ role: 'user', parts: [{ inline_data: { mime_type: mime, data: b64 } }, { text: PROMPT }] }],
+        contents: [{ role: 'user', parts: [imageData(dataUrl), { text: PROMPT }] }],
         generationConfig: { responseMimeType: 'application/json', responseSchema: SCHEMA },
       },
     });
@@ -101,5 +102,35 @@ const AI = (() => {
     return item;
   }
 
-  return { DEFAULT_MODEL, settings, enabled, listModels, analyze, apply, save: (s) => Store.set('ai', s) };
+  const imageData = (dataUrl) => {
+    const [, mime, data] = dataUrl.match(/^data:([^;]+);base64,(.*)$/) || [];
+    return { inline_data: { mime_type: mime, data } };
+  };
+
+  // Illustrazione 2D di una figura che indossa l'outfit, generata dai capi reali.
+  async function illustrate(items, profile) {
+    const { key, imageModel } = settings();
+    const who = { F: 'una donna', M: 'un uomo' }[profile.sex] || 'una persona';
+    const list = items.map((i, n) => `${n + 1}. ${i.name || labelOf(CATEGORIES, i.category)} (${labelOf(CATEGORIES, i.category).split(' / ')[0].toLowerCase()})`).join('\n');
+    const prompt = `Crea un'illustrazione 2D in stile figurino di moda, a figura intera, di ${who} di circa ${profile.age} anni, in piedi e in posa naturale, che indossa ESATTAMENTE i capi delle foto allegate, rispettandone colori, fantasie e forme:
+${list}
+Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante con contorni puliti, viso stilizzato, nessun testo, nessun logo.`;
+    const data = await request(`/models/${encodeURIComponent(imageModel || DEFAULT_IMAGE_MODEL)}:generateContent`, {
+      key,
+      method: 'POST',
+      body: {
+        contents: [{ role: 'user', parts: [...items.map((i) => imageData(i.image)), { text: prompt }] }],
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+      },
+    });
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const img = parts.filter((p) => !p.thought).map((p) => p.inlineData || p.inline_data).find(Boolean);
+    if (!img) {
+      const reason = data.candidates?.[0]?.finishReason || data.promptFeedback?.blockReason;
+      throw new Error(reason ? `nessuna immagine generata (${reason})` : 'nessuna immagine generata');
+    }
+    return `data:${img.mimeType || img.mime_type || 'image/png'};base64,${img.data}`;
+  }
+
+  return { DEFAULT_MODEL, DEFAULT_IMAGE_MODEL, illustrate, settings, enabled, listModels, analyze, apply, save: (s) => Store.set('ai', s) };
 })();
