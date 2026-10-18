@@ -38,7 +38,7 @@ const AI = (() => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = (data.error && data.error.message) || `HTTP ${res.status}`;
-      const err = new Error(res.status === 400 && /API key/i.test(msg) ? 'Chiave API non valida' : msg);
+      const err = new Error(res.status === 400 && /API key/i.test(msg) ? 'Chiave API non valida' : `${msg} (HTTP ${res.status})`);
       err.status = res.status;
       throw err;
     }
@@ -115,14 +115,27 @@ const AI = (() => {
     const prompt = `Crea un'illustrazione 2D in stile figurino di moda, a figura intera, di ${who} di circa ${profile.age} anni, in piedi e in posa naturale, che indossa ESATTAMENTE i capi delle foto allegate, rispettandone colori, fantasie e forme:
 ${list}
 Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante con contorni puliti, viso stilizzato, nessun testo, nessun logo.`;
-    const data = await request(`/models/${encodeURIComponent(imageModel || DEFAULT_IMAGE_MODEL)}:generateContent`, {
-      key,
-      method: 'POST',
-      body: {
-        contents: [{ role: 'user', parts: [...items.map((i) => imageData(i.image)), { text: prompt }] }],
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-      },
-    });
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: prompt }, ...items.map((i) => imageData(i.image))] }],
+      generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+    };
+    const call = (model) => request(`/models/${encodeURIComponent(model)}:generateContent`, { key, method: 'POST', body });
+
+    // Il modello salvato potrebbe non esistere per questa chiave (es. chiave
+    // verificata prima che esistessero le illustrazioni): in quel caso ne
+    // sceglie uno tra quelli realmente disponibili e riprova una volta.
+    let model = imageModel || DEFAULT_IMAGE_MODEL;
+    let data;
+    try {
+      data = await call(model);
+    } catch (err) {
+      if (err.status !== 404 && err.status !== 400) throw err;
+      const fallback = await pickImageModel(key, model);
+      if (!fallback) throw new Error(`${err.message} — nessun modello per immagini disponibile per questa chiave`);
+      model = fallback;
+      data = await call(model);
+      save({ ...settings(), imageModel: model });
+    }
     const parts = data.candidates?.[0]?.content?.parts || [];
     const img = parts.filter((p) => !p.thought).map((p) => p.inlineData || p.inline_data).find(Boolean);
     if (!img) {
@@ -132,5 +145,15 @@ Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante
     return `data:${img.mimeType || img.mime_type || 'image/png'};base64,${img.data}`;
   }
 
-  return { DEFAULT_MODEL, DEFAULT_IMAGE_MODEL, illustrate, settings, enabled, listModels, analyze, apply, save: (s) => Store.set('ai', s) };
+  const PREFERRED_IMAGE_MODELS = ['gemini-nano-banana-2.1', 'gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image', 'gemini-3-pro-image', 'gemini-2.5-flash-image'];
+
+  async function pickImageModel(key, exclude) {
+    const { imageModels } = await listModels(key);
+    const ids = imageModels.map((m) => m.id).filter((id) => id !== exclude);
+    return PREFERRED_IMAGE_MODELS.find((id) => ids.includes(id)) || ids[0] || null;
+  }
+
+  const save = (s) => Store.set('ai', s);
+
+  return { DEFAULT_MODEL, DEFAULT_IMAGE_MODEL, illustrate, settings, enabled, listModels, analyze, apply, save };
 })();

@@ -357,7 +357,14 @@
     if (mode === 'ai' && !AI.settings().key) {
       $('#ai-render-msg').innerHTML = 'Per le illustrazioni serve la chiave API di Gemini: inseriscila nel <a href="#" data-go="profile">profilo</a>.';
       $('#btn-illustrate').classList.add('hidden');
+    } else if (mode === 'ai' && state.current && state.current.illustrationError) {
+      $('#ai-render-msg').textContent = `Illustrazione non riuscita: ${state.current.illustrationError}`;
+      $('#ai-render-msg').classList.add('err');
+      $('#btn-illustrate').textContent = '↻ Riprova';
+      $('#btn-illustrate').classList.remove('hidden');
     } else if (mode === 'ai' && !hasAi) {
+      $('#ai-render-msg').classList.remove('err');
+      $('#btn-illustrate').textContent = '✨ Genera illustrazione';
       $('#ai-render-msg').textContent = 'Genera un\'illustrazione 2D di una figura che indossa questo outfit, partendo dalle foto dei tuoi capi.';
       $('#btn-illustrate').classList.remove('hidden');
     }
@@ -376,8 +383,10 @@
     const ph = $('#ai-placeholder');
     resetIllustration();
     outfit.illustration = null;
+    outfit.illustrationError = null;
     setRenderMode('ai');
     ph.classList.add('loading');
+    $('#ai-render-msg').classList.remove('err');
     $('#ai-render-msg').textContent = 'Sto disegnando il tuo outfit… può richiedere qualche secondo.';
     try {
       const url = await AI.illustrate(outfit.items, state.profile);
@@ -388,7 +397,8 @@
       ph.classList.add('hidden');
     } catch (err) {
       if (state.current !== outfit) return;
-      $('#ai-render-msg').textContent = `Illustrazione non riuscita: ${err.message}`;
+      outfit.illustrationError = err.message;
+      console.error('Illustrazione AI non riuscita', err);
     } finally {
       ph.classList.remove('loading');
       if (state.current === outfit) setRenderMode(state.renderMode);
