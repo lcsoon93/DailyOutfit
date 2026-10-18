@@ -14,7 +14,7 @@ App web che, dopo aver caricato le foto dei tuoi vestiti e indicato sesso ed et�
 
 In *Profilo → Riconoscimento AI* inserisci una chiave API di Gemini (si crea gratis su [Google AI Studio](https://aistudio.google.com/apikey)) e premi *Salva e verifica*: la chiave viene controllata e il menu *Modello* si riempie con i modelli disponibili per il tuo account (predefinito `gemini-3.5-flash-lite`, veloce ed economico).
 
-Il secondo menu sceglie il modello per le illustrazioni (predefinito `gemini-3.1-flash-lite-image`, il più economico; `gemini-nano-banana-2.1` dà risultati migliori). La generazione di immagini potrebbe non rientrare nel piano gratuito: controlla i prezzi su Google AI Studio.
+Il secondo menu sceglie come creare le illustrazioni: con un modello che genera immagini (es. `gemini-nano-banana-2.1` o `gemini-3.1-flash-lite-image`, se il tuo account vi ha accesso) oppure con *Disegno vettoriale*, in cui il modello di riconoscimento (es. `gemini-3.5-flash-lite`) disegna il figurino in SVG. Se nessun modello per immagini è disponibile, l'app passa da sola al disegno vettoriale.
 
 Da quel momento ogni foto caricata viene inviata a Gemini, che restituisce nome, categoria, stili, stagioni e colore; nella scheda di un capo il pulsante *✨ Analizza con AI* ripete l'analisi.
 

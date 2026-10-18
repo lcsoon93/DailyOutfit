@@ -107,11 +107,24 @@ const AI = (() => {
     return { inline_data: { mime_type: mime, data } };
   };
 
+  // Valore speciale del menu: disegno vettoriale fatto dal modello di testo,
+  // per chi non ha accesso ai modelli che generano immagini.
+  const SVG_MODE = 'svg';
+  const isImageModel = (id) => /image|banana/.test(id || '');
+
+  function describe(items, profile) {
+    const who = { F: 'una donna', M: 'un uomo' }[profile.sex] || 'una persona';
+    const list = items.map((i, n) => `${n + 1}. ${i.name || labelOf(CATEGORIES, i.category)} (${labelOf(CATEGORIES, i.category).split(' / ')[0].toLowerCase()}, colore ${i.color})`).join('\n');
+    return { who, list };
+  }
+
   // Illustrazione 2D di una figura che indossa l'outfit, generata dai capi reali.
+  // Usa un modello per immagini se disponibile, altrimenti il disegno SVG.
   async function illustrate(items, profile) {
     const { key, imageModel } = settings();
-    const who = { F: 'una donna', M: 'un uomo' }[profile.sex] || 'una persona';
-    const list = items.map((i, n) => `${n + 1}. ${i.name || labelOf(CATEGORIES, i.category)} (${labelOf(CATEGORIES, i.category).split(' / ')[0].toLowerCase()})`).join('\n');
+    if (imageModel === SVG_MODE || (imageModel && !isImageModel(imageModel))) return illustrateSvg(items, profile);
+
+    const { who, list } = describe(items, profile);
     const prompt = `Crea un'illustrazione 2D in stile figurino di moda, a figura intera, di ${who} di circa ${profile.age} anni, in piedi e in posa naturale, che indossa ESATTAMENTE i capi delle foto allegate, rispettandone colori, fantasie e forme:
 ${list}
 Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante con contorni puliti, viso stilizzato, nessun testo, nessun logo.`;
@@ -121,20 +134,19 @@ Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante
     };
     const call = (model) => request(`/models/${encodeURIComponent(model)}:generateContent`, { key, method: 'POST', body });
 
-    // Il modello salvato potrebbe non esistere per questa chiave (es. chiave
-    // verificata prima che esistessero le illustrazioni): in quel caso ne
-    // sceglie uno tra quelli realmente disponibili e riprova una volta.
+    // Il modello salvato potrebbe non esistere per questa chiave: ne sceglie
+    // uno tra quelli disponibili, o ripiega sul disegno SVG se non ce ne sono.
     let model = imageModel || DEFAULT_IMAGE_MODEL;
     let data;
     try {
       data = await call(model);
     } catch (err) {
-      if (err.status !== 404 && err.status !== 400) throw err;
+      if (err.status !== 404 && err.status !== 400 && err.status !== 403) throw err;
       const fallback = await pickImageModel(key, model);
-      if (!fallback) throw new Error(`${err.message} — nessun modello per immagini disponibile per questa chiave`);
+      save({ ...settings(), imageModel: fallback || SVG_MODE });
+      if (!fallback) return illustrateSvg(items, profile);
       model = fallback;
       data = await call(model);
-      save({ ...settings(), imageModel: model });
     }
     const parts = data.candidates?.[0]?.content?.parts || [];
     const img = parts.filter((p) => !p.thought).map((p) => p.inlineData || p.inline_data).find(Boolean);
@@ -143,6 +155,69 @@ Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante
       throw new Error(reason ? `nessuna immagine generata (${reason})` : 'nessuna immagine generata');
     }
     return `data:${img.mimeType || img.mime_type || 'image/png'};base64,${img.data}`;
+  }
+
+  async function illustrateSvg(items, profile) {
+    const { key, model } = settings();
+    const { who, list } = describe(items, profile);
+    const prompt = `Disegna in SVG un figurino di moda 2D: ${who} di circa ${profile.age} anni, a figura intera, in piedi e frontale, che indossa questi capi (le foto allegate mostrano forma e fantasia; usa i colori indicati):
+${list}
+Requisiti:
+- Un unico elemento <svg> con viewBox="0 0 600 800" e xmlns="http://www.w3.org/2000/svg".
+- Stile flat elegante: sfondo chiaro neutro, figura slanciata con proporzioni da figurino, viso stilizzato senza dettagli, capelli semplici, pelle in tono naturale.
+- Ogni capo disegnato con path dalla forma realistica (colletto, maniche, orli, pieghe con tonalità leggermente più scure per le ombre), sovrapposti nell'ordine corretto (scarpe, pantaloni o gonna, maglia, maglione, giacca).
+- Niente testo, script, immagini esterne o font.
+Rispondi solo con il codice SVG.`;
+    const data = await request(`/models/${encodeURIComponent(model || DEFAULT_MODEL)}:generateContent`, {
+      key,
+      method: 'POST',
+      body: {
+        contents: [{ role: 'user', parts: [{ text: prompt }, ...items.map((i) => imageData(i.image))] }],
+        generationConfig: { maxOutputTokens: 16384 },
+      },
+    });
+    const text = (data.candidates?.[0]?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || '').join('');
+    const match = text.match(/<svg[\s\S]*<\/svg>/i);
+    if (!match) {
+      const reason = data.candidates?.[0]?.finishReason;
+      throw new Error(reason === 'MAX_TOKENS' ? 'disegno troppo lungo, riprova' : 'il modello non ha restituito un disegno');
+    }
+    return svgToPng(sanitizeSvg(match[0]));
+  }
+
+  // Tiene solo elementi grafici: niente script, eventi o riferimenti esterni.
+  function sanitizeSvg(markup) {
+    const doc = new DOMParser().parseFromString(markup, 'image/svg+xml');
+    const svg = doc.documentElement;
+    if (svg.nodeName !== 'svg' || doc.querySelector('parsererror')) throw new Error('disegno non valido');
+    svg.querySelectorAll('script, foreignObject, image, iframe, style').forEach((n) => n.remove());
+    for (const n of [svg, ...svg.querySelectorAll('*')]) {
+      for (const a of [...n.attributes]) {
+        if (/^on/i.test(a.name) || (/href$/i.test(a.name) && !a.value.startsWith('#'))) n.removeAttribute(a.name);
+      }
+    }
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', '0 0 600 800');
+    svg.setAttribute('width', '600');
+    svg.setAttribute('height', '800');
+    return new XMLSerializer().serializeToString(svg);
+  }
+
+  function svgToPng(svg) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 900; canvas.height = 1200;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#f7f3ee';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('disegno non valido'));
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
   }
 
   const PREFERRED_IMAGE_MODELS = ['gemini-nano-banana-2.1', 'gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image', 'gemini-3-pro-image', 'gemini-2.5-flash-image'];
@@ -155,5 +230,5 @@ Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante
 
   const save = (s) => Store.set('ai', s);
 
-  return { DEFAULT_MODEL, DEFAULT_IMAGE_MODEL, illustrate, settings, enabled, listModels, analyze, apply, save };
+  return { DEFAULT_MODEL, DEFAULT_IMAGE_MODEL, SVG_MODE, illustrate, settings, enabled, listModels, analyze, apply, save };
 })();

@@ -477,12 +477,18 @@
     for (const m of ids) select.append(el('option', { value: m.id, text: m.label === m.id ? m.id : `${m.label} (${m.id})` }));
     select.value = selected;
   }
+  // Il menu delle illustrazioni offre sempre anche il disegno SVG, che
+  // funziona con qualunque modello di testo.
+  const SVG_OPTION = { id: AI.SVG_MODE, label: 'Disegno vettoriale (usa il modello di riconoscimento)' };
+  function setImageModels(models, selected) {
+    setModels(aiForm.imageModel, [...models, SVG_OPTION], selected);
+  }
   function fillAi() {
     const s = AI.settings();
     aiForm.key.value = s.key || '';
     aiForm.enabled.checked = s.enabled !== false;
     setModels(aiForm.model, [], s.model || AI.DEFAULT_MODEL);
-    setModels(aiForm.imageModel, [], s.imageModel || AI.DEFAULT_IMAGE_MODEL);
+    setImageModels([], s.imageModel || AI.DEFAULT_IMAGE_MODEL);
   }
   const aiFormSettings = (key) => ({
     key,
@@ -503,8 +509,9 @@
       const { models, imageModels } = await AI.listModels(key);
       setModels(aiForm.model, models, settings.model);
       // se il modello immagine predefinito non c'è, scegline uno disponibile
-      const imageModel = imageModels.some((m) => m.id === settings.imageModel) || !imageModels.length ? settings.imageModel : imageModels[0].id;
-      setModels(aiForm.imageModel, imageModels, imageModel);
+      const keep = settings.imageModel === AI.SVG_MODE || imageModels.some((m) => m.id === settings.imageModel);
+      const imageModel = keep ? settings.imageModel : imageModels.length ? imageModels[0].id : AI.SVG_MODE;
+      setImageModels(imageModels, imageModel);
       AI.save(aiFormSettings(key));
       check.className = 'hint ok';
       check.textContent = `Chiave valida ✓ (${models.length} modelli di testo, ${imageModels.length} per immagini)`;
