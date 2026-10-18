@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DailyOutfit</title>
+  <meta name="description" content="Carica i tuoi vestiti e genera un outfit per ogni occasione.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="logo">Daily<span>Outfit</span></h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-view="outfit" role="tab">Outfit</button>
+      <button class="tab" data-view="wardrobe" role="tab">Armadio</button>
+      <button class="tab" data-view="favorites" role="tab">Preferiti</button>
+      <button class="tab" data-view="profile" role="tab">Profilo</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- OUTFIT -->
+    <section id="view-outfit" class="view active">
+      <div class="card">
+        <h2>Per quale occasione?</h2>
+        <div id="occasion-list" class="chips"></div>
+
+        <h3>Che tempo fa?</h3>
+        <div id="weather-list" class="chips small"></div>
+
+        <button id="btn-generate" class="primary big">Genera outfit</button>
+        <p id="generate-hint" class="hint"></p>
+      </div>
+
+      <div id="outfit-result" class="card hidden">
+        <div class="result-head">
+          <h2 id="outfit-title"></h2>
+          <div class="result-actions">
+            <button id="btn-regenerate" class="secondary">Un altro</button>
+            <button id="btn-save" class="secondary">♥ Salva</button>
+          </div>
+        </div>
+        <div id="outfit-items" class="outfit-grid"></div>
+        <div id="outfit-notes" class="notes"></div>
+      </div>
+    </section>
+
+    <!-- WARDROBE -->
+    <section id="view-wardrobe" class="view">
+      <div class="card">
+        <h2>Il tuo armadio</h2>
+        <p class="hint">Carica una foto per ogni capo, possibilmente su sfondo neutro: il colore viene riconosciuto in automatico.</p>
+        <label class="upload">
+          <input id="file-input" type="file" accept="image/*" multiple>
+          <span>+ Aggiungi foto</span>
+        </label>
+      </div>
+
+      <div class="filter-row">
+        <div id="category-filter" class="chips small"></div>
+      </div>
+      <div id="wardrobe-grid" class="wardrobe-grid"></div>
+      <p id="wardrobe-empty" class="empty">Nessun capo ancora. Inizia caricando qualche foto.</p>
+    </section>
+
+    <!-- FAVORITES -->
+    <section id="view-favorites" class="view">
+      <h2 class="section-title">Outfit salvati</h2>
+      <div id="favorites-list"></div>
+      <p id="favorites-empty" class="empty">Non hai ancora salvato nessun outfit.</p>
+    </section>
+
+    <!-- PROFILE -->
+    <section id="view-profile" class="view">
+      <div class="card">
+        <h2>Profilo</h2>
+        <form id="profile-form">
+          <label>Sesso
+            <select name="sex" required>
+              <option value="">Seleziona…</option>
+              <option value="F">Donna</option>
+              <option value="M">Uomo</option>
+              <option value="X">Preferisco non specificare</option>
+            </select>
+          </label>
+          <label>Età
+            <input name="age" type="number" min="3" max="110" required>
+          </label>
+          <button class="primary" type="submit">Salva profilo</button>
+          <span id="profile-saved" class="saved hidden">Salvato ✓</span>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Backup</h2>
+        <p class="hint">I dati restano solo in questo browser. Esporta un backup per non perderli o per spostarli su un altro dispositivo.</p>
+        <div class="row">
+          <button id="btn-export" class="secondary">Esporta</button>
+          <label class="secondary file-btn">Importa<input id="import-input" type="file" accept="application/json"></label>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Item editor -->
+  <dialog id="item-dialog">
+    <form id="item-form" method="dialog">
+      <div class="dialog-body">
+        <img id="item-preview" alt="">
+        <div class="dialog-fields">
+          <label>Nome <input name="name" placeholder="es. Camicia bianca"></label>
+          <label>Categoria
+            <select name="category" required></select>
+          </label>
+          <fieldset>
+            <legend>Stile (anche più di uno)</legend>
+            <div id="style-options" class="checks"></div>
+          </fieldset>
+          <fieldset>
+            <legend>Stagione</legend>
+            <div id="season-options" class="checks"></div>
+          </fieldset>
+          <label>Colore
+            <span class="color-row">
+              <input name="color" type="color">
+              <span id="color-name"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="btn-delete-item" class="danger">Elimina</button>
+        <span class="spacer"></span>
+        <button type="button" id="btn-cancel-item" class="secondary">Annulla</button>
+        <button type="submit" class="primary">Salva</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/db.js"></script>
+  <script src="js/colors.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/generator.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
