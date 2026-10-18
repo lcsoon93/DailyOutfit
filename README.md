@@ -8,13 +8,18 @@ App web che, dopo aver caricato le foto dei tuoi vestiti e indicato sesso ed et�
 2. **Armadio**: carica le foto dei capi (meglio su sfondo neutro). Per ogni capo scegli categoria, stile (sportivo, casual, smart, elegante) e stagione; il colore viene riconosciuto in automatico dalla foto e si può correggere.
    Con il riconoscimento AI attivo (vedi sotto) questi campi vengono compilati da Gemini e tu devi solo confermare.
 3. **Outfit**: scegli l'occasione e il meteo, poi premi *Genera outfit*. *Un altro* propone un'alternativa, *Salva* lo aggiunge ai preferiti.
-4. **Render 2D**: ogni outfit viene mostrato come collage "flat lay" con i capi ritagliati dallo sfondo (si scarica in PNG). Con la chiave Gemini, *✨ Illustrazione AI* genera un figurino di una persona che indossa l'outfit, a partire dalle foto dei capi.
+4. **Collage**: ogni outfit viene composto in una tavola in stile rivista (1080×1350, scaricabile in PNG) con i capi scontornati: parte sopra e sotto al centro come se fossero indossati, giacca, maglione, accessori e scarpe di lato, palette dei colori e nomi dei capi in basso.
+
+## Scontorno dei capi
+
+Dopo il caricamento ogni foto viene scontornata in background con un modello di segmentazione che gira direttamente nel browser ([`@imgly/background-removal`](https://github.com/imgly/background-removal-js)): le foto non vengono inviate a nessun server. La prima volta il browser scarica il modello (~80 MB), poi resta in cache. Se il modello non è disponibile si usa un ritaglio semplice basato sul colore dello sfondo. Nella scheda di un capo si può scegliere se usare la foto scontornata o l'originale.
+
+Anche i capi caricati prima vengono scontornati in automatico alla prima apertura.
 
 ## Riconoscimento AI con Gemini
 
 In *Profilo → Riconoscimento AI* inserisci una chiave API di Gemini (si crea gratis su [Google AI Studio](https://aistudio.google.com/apikey)) e premi *Salva e verifica*: la chiave viene controllata e il menu *Modello* si riempie con i modelli disponibili per il tuo account (predefinito `gemini-3.5-flash-lite`, veloce ed economico).
 
-Il secondo menu sceglie come creare le illustrazioni: con un modello che genera immagini (es. `gemini-nano-banana-2.1` o `gemini-3.1-flash-lite-image`, se il tuo account vi ha accesso) oppure con *Disegno vettoriale*, in cui il modello di riconoscimento (es. `gemini-3.5-flash-lite`) disegna il figurino in SVG. Il disegno vettoriale usa di default `gemini-3.8-flash`, molto più preciso di Flash-Lite (circa un minuto per disegno). Sul piano gratuito dell'API i modelli per immagini hanno quota 0: l'app se ne accorge e passa da sola al disegno vettoriale. Per usare Nano Banana serve attivare la fatturazione sul progetto della chiave in Google AI Studio (l'abbonamento Google AI Pro dell'app Gemini non vale per l'API).
 
 Da quel momento ogni foto caricata viene inviata a Gemini, che restituisce nome, categoria, stili, stagioni e colore; nella scheda di un capo il pulsante *✨ Analizza con AI* ripete l'analisi.
 
@@ -47,6 +52,7 @@ js/colors.js      riconoscimento colore e regole di abbinamento
 js/ai.js          riconoscimento dei capi con Gemini
 js/data.js        categorie, stili, stagioni, occasioni, meteo
 js/generator.js   motore di generazione degli outfit
-js/render.js      collage 2D dell'outfit con ritaglio dello sfondo
+js/cutout.js      scontorno dei capi (modello nel browser + ripiego semplice)
+js/render.js      tavola collage dell'outfit
 js/app.js         logica dell'interfaccia
 ```

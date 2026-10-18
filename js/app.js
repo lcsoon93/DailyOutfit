@@ -161,7 +161,7 @@
     $('#wardrobe-empty').classList.toggle('hidden', state.items.length > 0);
     for (const item of list) {
       grid.append(el('button', { class: 'item-card', onclick: () => openEditor(item) }, [
-        el('img', { src: item.image, alt: item.name, loading: 'lazy' }),
+        el('img', { src: showCutout(item) ? item.cutout : item.image, alt: item.name, loading: 'lazy', class: showCutout(item) ? 'cut' : '' }),
         el('div', { class: 'item-meta' }, [
           el('span', { class: 'swatch', style: `background:${item.color}` }),
           el('span', { class: 'item-name', text: item.name || labelOf(CATEGORIES, item.category) }),
@@ -171,17 +171,60 @@
     }
   }
 
+  const showCutout = (item) => Boolean(item.cutout && !item.noCutout);
+
+  // ---------- scontorno ----------
+  // I capi senza scontorno (cutout === undefined) vengono elaborati uno alla
+  // volta in background; null significa "provato, non riuscito".
+  let cutoutRunning = false;
+  async function processCutouts() {
+    if (cutoutRunning) return;
+    cutoutRunning = true;
+    const status = $('#cutout-status');
+    try {
+      for (;;) {
+        const todo = state.items.filter((i) => i.cutout === undefined);
+        if (!todo.length) break;
+        const item = todo[0];
+        status.textContent = `✂️ Scontorno dei capi… (${todo.length} ${todo.length === 1 ? 'rimanente' : 'rimanenti'})`;
+        try {
+          item.cutout = await Cutout.make(item.image, (p) => {
+            status.textContent = `✂️ Preparo lo scontorno automatico, solo la prima volta… ${Math.round(p * 100)}%`;
+          });
+        } catch (err) {
+          console.warn('Scontorno non riuscito', err);
+          item.cutout = null;
+        }
+        if (!state.items.includes(item)) continue; // eliminato nel frattempo
+        await DB.put('items', item);
+        renderWardrobe();
+        if (state.current && state.current.items.includes(item)) renderCollage();
+      }
+    } finally {
+      cutoutRunning = false;
+      status.textContent = '';
+    }
+  }
+
   // ---------- editor capo ----------
   const dialog = $('#item-dialog');
   const form = $('#item-form');
   form.category.append(...CATEGORIES.map((c) => el('option', { value: c.id, text: c.label })));
   $('#style-options').append(...STYLES.map((s) => el('label', {}, [el('input', { type: 'checkbox', name: 'styles', value: s.id }), s.label])));
   $('#season-options').append(...SEASONS.map((s) => el('label', {}, [el('input', { type: 'checkbox', name: 'seasons', value: s.id }), s.label])));
+  form.useCutout.addEventListener('change', () => {
+    const item = state.editing;
+    $('#item-preview').src = form.useCutout.checked ? item.cutout : item.image;
+    $('#item-preview').classList.toggle('cut', form.useCutout.checked);
+  });
   form.color.addEventListener('input', () => { $('#color-name').textContent = Colors.nearest(form.color.value).name; });
 
   function openEditor(item) {
     state.editing = item;
-    $('#item-preview').src = item.image;
+    $('#item-preview').src = showCutout(item) ? item.cutout : item.image;
+    $('#item-preview').classList.toggle('cut', showCutout(item));
+    $('#cutout-toggle').classList.toggle('hidden', !item.cutout);
+    form.useCutout.checked = !item.noCutout;
     fillForm(item);
     $('#btn-delete-item').textContent = item.isNew ? 'Scarta' : 'Elimina';
     $('#btn-ai-item').classList.toggle('hidden', !AI.settings().key);
@@ -228,13 +271,16 @@
       seasons: seasons.length ? seasons : SEASONS.map((s) => s.id),
       color: form.color.value,
     });
+    if (item.cutout) item.noCutout = !form.useCutout.checked;
     delete item.isNew;
     Store.set('lastCategory', item.category);
     await DB.put('items', item);
     if (!state.items.includes(item)) state.items.push(item);
     dialog.close();
     renderWardrobe();
+    if (state.current && state.current.items.includes(item)) renderCollage();
     nextInQueue();
+    processCutouts();
   });
 
   $('#btn-cancel-item').addEventListener('click', () => { dialog.close(); nextInQueue(); });
@@ -321,9 +367,8 @@
     $('#btn-regenerate').disabled = false;
     $('#outfit-title').textContent = `Outfit per: ${occName(res.occasion)}`;
     renderOutfitItems($('#outfit-items'), res.items);
-    Render.collage(res.items, $('#collage-canvas'));
-    resetIllustration();
-    setRenderMode(state.renderMode === 'ai' ? 'collage' : state.renderMode);
+    renderCollage();
+    setRenderMode(state.renderMode);
     const notes = $('#outfit-notes');
     notes.innerHTML = '';
     notes.append(el('ul', {}, res.notes.map((n) => el('li', { text: n }))));
@@ -349,70 +394,25 @@
     state.renderMode = mode;
     document.querySelectorAll('.seg').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     $('#collage-canvas').classList.toggle('hidden', mode !== 'collage');
-    $('#ai-render').classList.toggle('hidden', mode !== 'ai');
     $('#outfit-items').classList.toggle('hidden', mode !== 'items');
-    const hasAi = Boolean(state.current && state.current.illustration);
-    $('#btn-download').classList.toggle('hidden', mode === 'items' || (mode === 'ai' && !hasAi));
-    $('#btn-reillustrate').classList.toggle('hidden', mode !== 'ai' || !hasAi);
-    if (mode === 'ai' && !AI.settings().key) {
-      $('#ai-render-msg').innerHTML = 'Per le illustrazioni serve la chiave API di Gemini: inseriscila nel <a href="#" data-go="profile">profilo</a>.';
-      $('#btn-illustrate').classList.add('hidden');
-    } else if (mode === 'ai' && state.current && state.current.illustrationError) {
-      $('#ai-render-msg').textContent = `Illustrazione non riuscita: ${state.current.illustrationError}`;
-      $('#ai-render-msg').classList.add('err');
-      $('#btn-illustrate').textContent = '↻ Riprova';
-      $('#btn-illustrate').classList.remove('hidden');
-    } else if (mode === 'ai' && !hasAi) {
-      $('#ai-render-msg').classList.remove('err');
-      $('#btn-illustrate').textContent = '✨ Genera illustrazione';
-      $('#ai-render-msg').textContent = 'Genera un\'illustrazione 2D di una figura che indossa questo outfit, partendo dalle foto dei tuoi capi.';
-      $('#btn-illustrate').classList.remove('hidden');
-    }
+    $('#btn-download').classList.toggle('hidden', mode !== 'collage');
   }
   document.querySelectorAll('.seg').forEach((b) => b.addEventListener('click', () => setRenderMode(b.dataset.mode)));
 
-  function resetIllustration() {
-    $('#ai-image').classList.add('hidden');
-    $('#ai-image').removeAttribute('src');
-    $('#ai-placeholder').classList.remove('hidden', 'loading');
+  function renderCollage() {
+    const c = state.current;
+    if (c) Render.collage(c.items, $('#collage-canvas'), collageMeta(c.occasion.id, c.weather.id));
   }
 
-  async function illustrate() {
-    const outfit = state.current;
-    if (!outfit) return;
-    const ph = $('#ai-placeholder');
-    resetIllustration();
-    outfit.illustration = null;
-    outfit.illustrationError = null;
-    setRenderMode('ai');
-    ph.classList.add('loading');
-    $('#ai-render-msg').classList.remove('err');
-    $('#ai-render-msg').textContent = 'Sto disegnando il tuo outfit… può richiedere fino a un minuto.';
-    try {
-      const url = await AI.illustrate(outfit.items, state.profile);
-      if (state.current !== outfit) return; // nel frattempo è stato generato un altro outfit
-      outfit.illustration = url;
-      $('#ai-image').src = url;
-      $('#ai-image').classList.remove('hidden');
-      ph.classList.add('hidden');
-    } catch (err) {
-      if (state.current !== outfit) return;
-      outfit.illustrationError = err.message;
-      console.error('Illustrazione AI non riuscita', err);
-    } finally {
-      ph.classList.remove('loading');
-      if (state.current === outfit) setRenderMode(state.renderMode);
-    }
-  }
-  $('#btn-illustrate').addEventListener('click', illustrate);
-  $('#btn-reillustrate').addEventListener('click', illustrate);
+  const collageMeta = (occasionId, weatherId) => {
+    const occ = OCCASIONS.find((o) => o.id === occasionId);
+    return { title: occ ? occName(occ) : '', subtitle: labelOf(WEATHER, weatherId).replace(/^\S+\s/, '') };
+  };
 
   $('#btn-download').addEventListener('click', () => {
     if (!state.current) return;
-    const ai = state.renderMode === 'ai' && state.current.illustration;
-    const href = ai ? state.current.illustration : $('#collage-canvas').toDataURL('image/png');
-    const ext = ai ? (href.match(/^data:image\/(\w+)/) || [, 'png'])[1].replace('jpeg', 'jpg') : 'png';
-    const a = el('a', { href, download: `outfit-${state.current.occasion.id}-${new Date().toISOString().slice(0, 10)}.${ext}` });
+    const href = $('#collage-canvas').toDataURL('image/png');
+    const a = el('a', { href, download: `outfit-${state.current.occasion.id}-${new Date().toISOString().slice(0, 10)}.png` });
     document.body.append(a);
     a.click();
     a.remove();
@@ -447,7 +447,7 @@
       const grid = el('div', { class: 'outfit-grid compact' });
       renderOutfitItems(grid, items);
       const thumb = el('canvas', { class: 'fav-collage' });
-      if (items.length) Render.collage(items, thumb);
+      if (items.length) Render.collage(items, thumb, collageMeta(f.occasion, f.weather));
       list.append(el('div', { class: 'card' }, [
         el('div', { class: 'result-head' }, [
           el('h3', { text: `${occ ? occ.label : f.occasion} · ${labelOf(WEATHER, f.weather)}` }),
@@ -477,25 +477,15 @@
     for (const m of ids) select.append(el('option', { value: m.id, text: m.label === m.id ? m.id : `${m.label} (${m.id})` }));
     select.value = selected;
   }
-  // Il menu delle illustrazioni offre sempre anche il disegno SVG, che
-  // funziona con qualunque modello di testo.
-  function setImageModels(models, selected) {
-    const svg = [{ id: AI.SVG_MODE, label: `Disegno vettoriale con ${AI.DEFAULT_SVG_MODEL} (consigliato, ~1 minuto)` }];
-    const fast = aiForm.model.value || AI.DEFAULT_MODEL;
-    if (fast !== AI.DEFAULT_SVG_MODEL) svg.push({ id: `${AI.SVG_MODE}:${fast}`, label: `Disegno vettoriale con ${fast} (più veloce, meno preciso)` });
-    setModels(aiForm.imageModel, [...svg, ...models], selected);
-  }
   function fillAi() {
     const s = AI.settings();
     aiForm.key.value = s.key || '';
     aiForm.enabled.checked = s.enabled !== false;
     setModels(aiForm.model, [], s.model || AI.DEFAULT_MODEL);
-    setImageModels([], s.imageModel || AI.DEFAULT_IMAGE_MODEL);
   }
   const aiFormSettings = (key) => ({
     key,
     model: aiForm.model.value || AI.DEFAULT_MODEL,
-    imageModel: aiForm.imageModel.value || AI.DEFAULT_IMAGE_MODEL,
     enabled: aiForm.enabled.checked,
   });
   aiForm.addEventListener('submit', async (e) => {
@@ -508,22 +498,16 @@
     check.className = 'hint';
     check.textContent = 'Verifico la chiave…';
     try {
-      const { models, imageModels } = await AI.listModels(key);
+      const models = await AI.listModels(key);
       setModels(aiForm.model, models, settings.model);
-      // se il modello immagine predefinito non c'è, scegline uno disponibile
-      const keep = (settings.imageModel || '').startsWith(AI.SVG_MODE) || imageModels.some((m) => m.id === settings.imageModel);
-      const imageModel = keep ? settings.imageModel : imageModels.length ? imageModels[0].id : AI.SVG_MODE;
-      setImageModels(imageModels, imageModel);
-      AI.save(aiFormSettings(key));
       check.className = 'hint ok';
-      check.textContent = `Chiave valida ✓ (${models.length} modelli di testo, ${imageModels.length} per immagini)`;
+      check.textContent = `Chiave valida ✓ (${models.length} modelli disponibili)`;
     } catch (err) {
       check.className = 'hint err';
       check.textContent = `Errore: ${err.message}`;
     }
   });
   aiForm.model.addEventListener('change', () => AI.save({ ...AI.settings(), model: aiForm.model.value }));
-  aiForm.imageModel.addEventListener('change', () => AI.save({ ...AI.settings(), imageModel: aiForm.imageModel.value }));
   $('#btn-ai-remove').addEventListener('click', () => {
     AI.save({ ...AI.settings(), key: '', enabled: true });
     fillAi();
@@ -571,6 +555,7 @@
     renderWardrobe();
     renderOutfitControls();
     renderFavorites();
+    processCutouts();
   }
 
   load().then(() => {

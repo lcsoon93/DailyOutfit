@@ -43,23 +43,14 @@
         <div id="outfit-render" class="render">
           <div class="segmented" role="tablist">
             <button class="seg active" data-mode="collage">Collage</button>
-            <button class="seg" data-mode="ai">✨ Illustrazione AI</button>
             <button class="seg" data-mode="items">Capi</button>
           </div>
           <div class="render-stage">
             <canvas id="collage-canvas" class="render-image" aria-label="Collage dell'outfit"></canvas>
-            <div id="ai-render" class="hidden">
-              <img id="ai-image" class="render-image hidden" alt="Illustrazione dell'outfit generata con AI">
-              <div id="ai-placeholder" class="ai-placeholder">
-                <p id="ai-render-msg">Genera un'illustrazione 2D di una figura che indossa questo outfit, partendo dalle foto dei tuoi capi.</p>
-                <button id="btn-illustrate" class="primary">✨ Genera illustrazione</button>
-              </div>
-            </div>
             <div id="outfit-items" class="outfit-grid hidden"></div>
           </div>
           <div class="row center">
             <button id="btn-download" class="secondary">⬇ Scarica immagine</button>
-            <button id="btn-reillustrate" class="secondary hidden">↻ Rigenera illustrazione</button>
           </div>
         </div>
         <div id="outfit-notes" class="notes"></div>
@@ -70,12 +61,13 @@
     <section id="view-wardrobe" class="view">
       <div class="card">
         <h2>Il tuo armadio</h2>
-        <p class="hint">Carica una foto per ogni capo, possibilmente su sfondo neutro: il colore viene riconosciuto in automatico.</p>
+        <p class="hint">Carica una foto per ogni capo, steso o appeso e ben visibile: lo sfondo viene rimosso in automatico e il colore riconosciuto.</p>
         <label class="upload">
           <input id="file-input" type="file" accept="image/*" multiple>
           <span>+ Aggiungi foto</span>
         </label>
         <p id="ai-status" class="hint"></p>
+        <p id="cutout-status" class="hint"></p>
       </div>
 
       <div class="filter-row">
@@ -123,9 +115,6 @@
           <label>Modello per il riconoscimento
             <select name="model"></select>
           </label>
-          <label>Modello per le illustrazioni
-            <select name="imageModel"></select>
-          </label>
           <label class="inline"><input name="enabled" type="checkbox"> Analizza automaticamente le nuove foto</label>
           <div class="row">
             <button class="primary" type="submit">Salva e verifica</button>
@@ -151,7 +140,10 @@
   <dialog id="item-dialog">
     <form id="item-form" method="dialog">
       <div class="dialog-body">
-        <img id="item-preview" alt="">
+        <div class="preview-col">
+          <img id="item-preview" alt="">
+          <label id="cutout-toggle" class="inline small hidden"><input name="useCutout" type="checkbox"> Usa la foto scontornata</label>
+        </div>
         <div class="dialog-fields">
           <label>Nome <input name="name" placeholder="es. Camicia bianca"></label>
           <label>Categoria
@@ -190,6 +182,7 @@
   <script src="js/data.js"></script>
   <script src="js/ai.js"></script>
   <script src="js/generator.js"></script>
+  <script src="js/cutout.js"></script>
   <script src="js/render.js"></script>
   <script src="js/app.js"></script>
 </body>
