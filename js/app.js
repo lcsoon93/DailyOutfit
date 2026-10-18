@@ -387,7 +387,7 @@
     setRenderMode('ai');
     ph.classList.add('loading');
     $('#ai-render-msg').classList.remove('err');
-    $('#ai-render-msg').textContent = 'Sto disegnando il tuo outfit… può richiedere qualche secondo.';
+    $('#ai-render-msg').textContent = 'Sto disegnando il tuo outfit… può richiedere fino a un minuto.';
     try {
       const url = await AI.illustrate(outfit.items, state.profile);
       if (state.current !== outfit) return; // nel frattempo è stato generato un altro outfit
@@ -479,9 +479,11 @@
   }
   // Il menu delle illustrazioni offre sempre anche il disegno SVG, che
   // funziona con qualunque modello di testo.
-  const SVG_OPTION = { id: AI.SVG_MODE, label: 'Disegno vettoriale (usa il modello di riconoscimento)' };
   function setImageModels(models, selected) {
-    setModels(aiForm.imageModel, [...models, SVG_OPTION], selected);
+    const svg = [{ id: AI.SVG_MODE, label: `Disegno vettoriale con ${AI.DEFAULT_SVG_MODEL} (consigliato, ~1 minuto)` }];
+    const fast = aiForm.model.value || AI.DEFAULT_MODEL;
+    if (fast !== AI.DEFAULT_SVG_MODEL) svg.push({ id: `${AI.SVG_MODE}:${fast}`, label: `Disegno vettoriale con ${fast} (più veloce, meno preciso)` });
+    setModels(aiForm.imageModel, [...svg, ...models], selected);
   }
   function fillAi() {
     const s = AI.settings();
@@ -509,7 +511,7 @@
       const { models, imageModels } = await AI.listModels(key);
       setModels(aiForm.model, models, settings.model);
       // se il modello immagine predefinito non c'è, scegline uno disponibile
-      const keep = settings.imageModel === AI.SVG_MODE || imageModels.some((m) => m.id === settings.imageModel);
+      const keep = (settings.imageModel || '').startsWith(AI.SVG_MODE) || imageModels.some((m) => m.id === settings.imageModel);
       const imageModel = keep ? settings.imageModel : imageModels.length ? imageModels[0].id : AI.SVG_MODE;
       setImageModels(imageModels, imageModel);
       AI.save(aiFormSettings(key));

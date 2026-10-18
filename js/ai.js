@@ -4,6 +4,8 @@ const AI = (() => {
   const BASE = 'https://generativelanguage.googleapis.com/v1beta';
   const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
   const DEFAULT_IMAGE_MODEL = 'gemini-3.1-flash-lite-image';
+  // Per il disegno SVG un modello più capace dà figurini molto migliori di Flash-Lite.
+  const DEFAULT_SVG_MODEL = 'gemini-3.8-flash';
 
   const settings = () => Store.get('ai', { key: '', model: DEFAULT_MODEL, enabled: true });
   const enabled = () => { const s = settings(); return Boolean(s.key && s.enabled); };
@@ -38,6 +40,11 @@ const AI = (() => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = (data.error && data.error.message) || `HTTP ${res.status}`;
+      if (res.status === 429 && /limit: 0/.test(msg)) {
+        const err = new Error(`modello non incluso nel tuo piano (quota 0) — ${msg}`);
+        err.status = 429;
+        throw err;
+      }
       const err = new Error(res.status === 400 && /API key/i.test(msg) ? 'Chiave API non valida' : `${msg} (HTTP ${res.status})`);
       err.status = res.status;
       throw err;
@@ -56,7 +63,7 @@ const AI = (() => {
         const id = m.name.replace(/^models\//, '');
         if (!(m.supportedGenerationMethods || []).includes('generateContent') || !/gemini/.test(id)) continue;
         if (/image|banana/.test(id)) imageModels.push({ id, label: m.displayName || id });
-        else if (!/embedding|tts|audio|live/.test(id)) models.push({ id, label: m.displayName || id });
+        else if (!/embedding|tts|audio|live|robotics|computer-use|transcribe|customtools|omni/.test(id)) models.push({ id, label: m.displayName || id });
       }
       pageToken = data.nextPageToken || '';
     } while (pageToken);
@@ -107,9 +114,11 @@ const AI = (() => {
     return { inline_data: { mime_type: mime, data } };
   };
 
-  // Valore speciale del menu: disegno vettoriale fatto dal modello di testo,
-  // per chi non ha accesso ai modelli che generano immagini.
+  // Valori speciali del menu: disegno vettoriale fatto da un modello di testo,
+  // per chi non ha accesso ai modelli che generano immagini. 'svg' usa
+  // DEFAULT_SVG_MODEL, 'svg:<modello>' un modello a scelta.
   const SVG_MODE = 'svg';
+  const isSvgMode = (id) => id === SVG_MODE || (id || '').startsWith(SVG_MODE + ':');
   const isImageModel = (id) => /image|banana/.test(id || '');
 
   function describe(items, profile) {
@@ -122,7 +131,8 @@ const AI = (() => {
   // Usa un modello per immagini se disponibile, altrimenti il disegno SVG.
   async function illustrate(items, profile) {
     const { key, imageModel } = settings();
-    if (imageModel === SVG_MODE || (imageModel && !isImageModel(imageModel))) return illustrateSvg(items, profile);
+    if (isSvgMode(imageModel)) return illustrateSvg(items, profile, imageModel.slice(SVG_MODE.length + 1));
+    if (imageModel && !isImageModel(imageModel)) return illustrateSvg(items, profile, imageModel);
 
     const { who, list } = describe(items, profile);
     const prompt = `Crea un'illustrazione 2D in stile figurino di moda, a figura intera, di ${who} di circa ${profile.age} anni, in piedi e in posa naturale, che indossa ESATTAMENTE i capi delle foto allegate, rispettandone colori, fantasie e forme:
@@ -141,6 +151,13 @@ Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante
     try {
       data = await call(model);
     } catch (err) {
+      // Piano gratuito dell'API: i modelli per immagini hanno quota 0,
+      // quindi si passa direttamente al disegno vettoriale.
+      if (err.status === 429 && /free_tier[\s\S]*limit: 0/.test(err.message)) {
+        save({ ...settings(), imageModel: SVG_MODE });
+        return illustrateSvg(items, profile);
+      }
+      if (err.status === 429) throw new Error('quota esaurita per questo modello, riprova più tardi');
       if (err.status !== 404 && err.status !== 400 && err.status !== 403) throw err;
       const fallback = await pickImageModel(key, model);
       save({ ...settings(), imageModel: fallback || SVG_MODE });
@@ -157,7 +174,7 @@ Formato verticale 3:4, sfondo chiaro e neutro, stile illustrazione flat elegante
     return `data:${img.mimeType || img.mime_type || 'image/png'};base64,${img.data}`;
   }
 
-  async function illustrateSvg(items, profile) {
+  async function illustrateSvg(items, profile, svgModel) {
     const { key, model } = settings();
     const { who, list } = describe(items, profile);
     const prompt = `Disegna in SVG un figurino di moda 2D: ${who} di circa ${profile.age} anni, a figura intera, in piedi e frontale, che indossa questi capi (le foto allegate mostrano forma e fantasia; usa i colori indicati):
@@ -168,14 +185,20 @@ Requisiti:
 - Ogni capo disegnato con path dalla forma realistica (colletto, maniche, orli, pieghe con tonalità leggermente più scure per le ombre), sovrapposti nell'ordine corretto (scarpe, pantaloni o gonna, maglia, maglione, giacca).
 - Niente testo, script, immagini esterne o font.
 Rispondi solo con il codice SVG.`;
-    const data = await request(`/models/${encodeURIComponent(model || DEFAULT_MODEL)}:generateContent`, {
-      key,
-      method: 'POST',
-      body: {
-        contents: [{ role: 'user', parts: [{ text: prompt }, ...items.map((i) => imageData(i.image))] }],
-        generationConfig: { maxOutputTokens: 16384 },
-      },
-    });
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: prompt }, ...items.map((i) => imageData(i.image))] }],
+      generationConfig: { maxOutputTokens: 16384 },
+    };
+    const call = (m) => request(`/models/${encodeURIComponent(m)}:generateContent`, { key, method: 'POST', body });
+    let data;
+    try {
+      data = await call(svgModel || DEFAULT_SVG_MODEL);
+    } catch (err) {
+      // modello per il disegno non disponibile o senza quota: usa quello del riconoscimento
+      const fallback = model || DEFAULT_MODEL;
+      if (svgModel || ![404, 429].includes(err.status) || fallback === DEFAULT_SVG_MODEL) throw err;
+      data = await call(fallback);
+    }
     const text = (data.candidates?.[0]?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || '').join('');
     const match = text.match(/<svg[\s\S]*<\/svg>/i);
     if (!match) {
@@ -230,5 +253,5 @@ Rispondi solo con il codice SVG.`;
 
   const save = (s) => Store.set('ai', s);
 
-  return { DEFAULT_MODEL, DEFAULT_IMAGE_MODEL, SVG_MODE, illustrate, settings, enabled, listModels, analyze, apply, save };
+  return { DEFAULT_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_SVG_MODEL, SVG_MODE, illustrate, settings, enabled, listModels, analyze, apply, save };
 })();
