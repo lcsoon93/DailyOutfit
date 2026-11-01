@@ -4,6 +4,7 @@
   "private": true,
   "description": "Il tuo armadio, l'outfit giusto per ogni occasione. App web + Android (Capacitor), senza server e senza AI.",
   "scripts": {
+    "test": "node --test tests/*.test.mjs",
     "serve": "node scripts/serve.mjs",
     "sync": "cap sync android",
     "open": "cap open android",

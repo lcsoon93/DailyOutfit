@@ -592,33 +592,34 @@
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    let data;
+    // prima si controlla tutto il file; i dati attuali si toccano solo se è valido
+    let backup;
     try {
-      data = JSON.parse(await file.text());
-      if (!Array.isArray(data.items)) throw new Error('formato');
-    } catch {
-      UI.toast('Questo file non è un backup di DailyOutfit');
+      backup = Backup.validate(JSON.parse(await file.text()));
+    } catch (err) {
+      UI.toast(`Backup non valido: ${err instanceof SyntaxError ? 'il file è danneggiato' : err.message}`);
       return;
     }
-    if (!(await UI.ask({ title: `Ripristinare ${data.items.length} capi?`, message: 'I dati attuali su questo telefono verranno sostituiti.', ok: 'Ripristina', danger: true }))) return;
+    if (!(await UI.ask({ title: `Ripristinare ${backup.items.length} capi?`, message: 'I dati attuali su questo telefono verranno sostituiti.', ok: 'Ripristina', danger: true }))) return;
     UI.busy(true, 'Ripristino…');
     try {
-      await DB.clear('items');
-      await DB.clear('favorites');
-      for (const i of data.items) await DB.put('items', i);
-      for (const f of data.favorites || []) await DB.put('favorites', f);
-      if (validProfile(data.profile)) { state.profile = data.profile; Store.set('profile', data.profile); }
+      await DB.replaceAll(backup.items, backup.favorites); // tutto o niente
+      if (backup.profile) { state.profile = backup.profile; Store.set('profile', backup.profile); }
+      state.current = null;
+      $('#result').classList.add('hidden');
       await load();
+      UI.toast('Backup ripristinato');
+    } catch (err) {
+      console.error(err);
+      UI.toast('Ripristino non riuscito: i tuoi dati non sono stati modificati.');
     } finally {
       UI.busy(false);
     }
-    UI.toast('Backup ripristinato');
   });
 
   $('#btn-wipe').addEventListener('click', async () => {
     if (!(await UI.ask({ title: 'Cancellare tutti i dati?', message: 'Capi, outfit salvati e profilo verranno eliminati da questo telefono. Non si può annullare.', ok: 'Cancella tutto', danger: true }))) return;
-    await DB.clear('items');
-    await DB.clear('favorites');
+    await DB.replaceAll([], []);
     try {
       Object.keys(localStorage).filter((k) => k.startsWith('dailyoutfit.')).forEach((k) => localStorage.removeItem(k));
     } catch { /* storage non disponibile */ }

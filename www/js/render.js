@@ -23,17 +23,25 @@ const Render = (() => {
   const WEIGHT = { top: 1, bottom: 1.35, onepiece: 1, outerwear: 1.35, layer: 1.05, accessory: 0.7, shoes: 0.62 };
   const SIDE_ORDER = ['outerwear', 'layer', 'accessory', 'shoes'];
 
+  // cache delle immagini già decodificate, limitata alle più usate di recente
+  const CACHE_MAX = 40;
   const imageCache = new Map();
   function loadImage(src) {
-    if (!imageCache.has(src)) {
-      imageCache.set(src, new Promise((resolve, reject) => {
+    let p = imageCache.get(src);
+    if (p) {
+      imageCache.delete(src); // spostata in fondo: è la più recente
+    } else {
+      p = new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => resolve(img);
         img.onerror = reject;
         img.src = src;
-      }));
+      });
+      p.catch(() => imageCache.delete(src)); // un errore non resta in cache
     }
-    return imageCache.get(src);
+    imageCache.set(src, p);
+    while (imageCache.size > CACHE_MAX) imageCache.delete(imageCache.keys().next().value);
+    return p;
   }
 
   function roundRect(ctx, x, y, w, h, r) {

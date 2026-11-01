@@ -15,6 +15,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - 'capacitor.config.json'
+      - 'tests/**'
       - '.github/workflows/android.yml'
   workflow_dispatch:
 
@@ -43,6 +44,9 @@ jobs:
 
       - name: Installa le dipendenze
         run: npm ci
+
+      - name: Test automatici
+        run: npm test
 
       - name: Copia l'app web nel progetto Android
         run: npx cap sync android
