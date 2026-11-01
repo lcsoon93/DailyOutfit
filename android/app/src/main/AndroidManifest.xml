@@ -35,6 +35,14 @@
         </provider>
     </application>
 
+    <!-- Da Android 11 serve dichiarare quali app si vogliono "vedere":
+         qui la fotocamera, per il pulsante «Scatta una foto» -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
