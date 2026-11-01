@@ -2,7 +2,6 @@
 // outfit, preferiti, profilo e backup.
 (() => {
   const { $, el } = UI;
-  const VERSION = '1.0.0';
   const SINGULAR = { top: 'Maglia', bottom: 'Pantaloni', onepiece: 'Vestito', layer: 'Maglione', outerwear: 'Giacca', shoes: 'Scarpe', accessory: 'Accessorio' };
 
   const validProfile = (p) => Boolean(p && p.sex && Number(p.age) >= 3);
@@ -566,7 +565,6 @@
     $('#stat-items').textContent = state.items.length;
     $('#stat-favs').textContent = state.favorites.length;
     $('#btn-demo-profile').classList.toggle('hidden', state.items.some((i) => i.demo));
-    $('#app-version').textContent = VERSION;
   }
 
   const clampAge = (v) => Math.min(110, Math.max(3, Math.round(Number(v) || 30)));
@@ -740,6 +738,8 @@
   if ('serviceWorker' in navigator && !Native.isNative && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+
+  Native.appVersion().then((v) => { $('#app-version').textContent = v; });
 
   load().then(() => {
     if (!state.profile) startOnboarding();

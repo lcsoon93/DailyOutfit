@@ -61,5 +61,17 @@ const Native = (() => {
     if (app) app.exitApp();
   }
 
-  return { isNative, shareFile, download, onBackButton, exitApp };
+  // Versione dell'app installata (solo su Android), es. "1.0.0 (12)".
+  async function appVersion() {
+    const app = plugin('App');
+    if (!app) return '';
+    try {
+      const info = await app.getInfo();
+      return `${info.version} (${info.build})`;
+    } catch {
+      return '';
+    }
+  }
+
+  return { isNative, shareFile, download, onBackButton, exitApp, appVersion };
 })();

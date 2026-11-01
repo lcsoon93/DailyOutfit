@@ -71,7 +71,7 @@ jobs:
         run: |
           echo "::warning::AAB non firmato. Aggiungi i segreti della chiave di caricamento (vedi DEPLOY.md) per poterlo caricare sul Play Store."
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: dailyoutfit-${{ github.run_number }}
           path: |
