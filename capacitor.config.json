@@ -1,0 +1,14 @@
+{
+  "appId": "io.github.lcsoon93.dailyoutfit",
+  "appName": "DailyOutfit",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#F6F2EC"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DEFAULT"
+    }
+  }
+}

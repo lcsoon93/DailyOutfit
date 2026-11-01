@@ -1,0 +1,7 @@
+node_modules/
+.DS_Store
+*.log
+# chiavi di firma Android: mai su git
+*.jks
+*.keystore
+keystore.properties

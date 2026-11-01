@@ -1,0 +1,26 @@
+{
+  "name": "dailyoutfit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Il tuo armadio, l'outfit giusto per ogni occasione. App web + Android (Capacitor), senza server e senza AI.",
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "sync": "cap sync android",
+    "open": "cap open android",
+    "apk": "cap sync android && cd android && ./gradlew assembleDebug",
+    "aab": "cap sync android && cd android && ./gradlew bundleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.4",
+    "@capacitor/share": "8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

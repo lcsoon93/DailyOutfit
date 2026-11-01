@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F6F2EC" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151311" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
+  <title>DailyOutfit</title>
+  <meta name="description" content="Fotografa i tuoi vestiti e ricevi l'outfit giusto per ogni occasione. Tutto resta sul tuo telefono.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+    <header class="appbar">
+      <div class="brand" aria-label="DailyOutfit"><span class="brand-daily">Daily</span><span class="brand-outfit">Outfit</span></div>
+      <span class="appbar-date" id="appbar-date"></span>
+    </header>
+
+    <main>
+      <!-- OGGI -->
+      <section class="screen active" id="screen-today" aria-labelledby="greeting">
+        <div class="hero">
+          <h1 class="display" id="greeting">Buongiorno</h1>
+          <p class="lead">Cosa ti aspetta oggi?</p>
+        </div>
+
+        <h2 class="section-label">Occasione</h2>
+        <div class="occasion-grid" id="occasion-grid" role="radiogroup" aria-label="Occasione"></div>
+
+        <h2 class="section-label">Meteo</h2>
+        <div class="segmented" id="weather-seg" role="radiogroup" aria-label="Meteo"></div>
+
+        <button class="btn btn-primary btn-block btn-lg" id="btn-generate"><i data-icon="today"></i>Crea il mio outfit</button>
+        <p class="hint center" id="generate-hint"></p>
+
+        <div class="result hidden" id="result">
+          <div class="collage-frame"><canvas id="collage" aria-label="Collage dell'outfit"></canvas></div>
+          <div class="result-actions">
+            <button class="btn btn-tonal" id="btn-another"><i data-icon="refresh" data-size="20"></i>Un altro</button>
+            <button class="btn btn-tonal" id="btn-save"><i data-icon="heart" data-size="20"></i><span>Salva</span></button>
+            <button class="btn btn-tonal" id="btn-share"><i data-icon="share" data-size="20"></i>Condividi</button>
+          </div>
+          <h2 class="section-label">I capi</h2>
+          <div class="item-strip" id="result-items"></div>
+          <ul class="tips" id="result-tips"></ul>
+        </div>
+
+        <div class="notice hidden" id="result-error">
+          <i data-icon="info"></i>
+          <div><p id="result-error-text"></p><button class="btn btn-tonal btn-sm" data-go="wardrobe">Vai all'armadio</button></div>
+        </div>
+      </section>
+
+      <!-- ARMADIO -->
+      <section class="screen" id="screen-wardrobe" aria-labelledby="wardrobe-title">
+        <div class="screen-head">
+          <h1 class="display" id="wardrobe-title">Armadio</h1>
+          <span class="count" id="wardrobe-count"></span>
+        </div>
+        <div class="notice notice-soft hidden" id="demo-banner">
+          <i data-icon="sparkle"></i>
+          <div><p>Stai usando i capi di esempio. Aggiungi i tuoi quando vuoi.</p>
+            <button class="btn btn-tonal btn-sm" id="btn-remove-demo">Rimuovi i capi di esempio</button></div>
+        </div>
+        <div class="chips chips-scroll" id="category-filter" role="tablist" aria-label="Categorie"></div>
+        <div class="item-grid" id="item-grid"></div>
+        <div class="empty hidden" id="wardrobe-empty">
+          <div class="empty-art"><i data-icon="wardrobe" data-size="56"></i></div>
+          <h2>Il tuo armadio è vuoto</h2>
+          <p>Fotografa i tuoi capi uno alla volta: lo sfondo viene tolto in automatico.</p>
+          <button class="btn btn-primary" data-action="add"><i data-icon="camera" data-size="20"></i>Aggiungi il primo capo</button>
+          <button class="btn btn-text" data-action="demo">Oppure prova con i capi di esempio</button>
+        </div>
+      </section>
+
+      <!-- PREFERITI -->
+      <section class="screen" id="screen-favorites" aria-labelledby="fav-title">
+        <div class="screen-head">
+          <h1 class="display" id="fav-title">Preferiti</h1>
+          <span class="count" id="fav-count"></span>
+        </div>
+        <div class="fav-grid" id="fav-grid"></div>
+        <div class="empty hidden" id="fav-empty">
+          <div class="empty-art"><i data-icon="heart" data-size="56"></i></div>
+          <h2>Nessun outfit salvato</h2>
+          <p>Quando un outfit ti piace, premi «Salva»: lo ritrovi qui.</p>
+          <button class="btn btn-primary" data-go="today">Crea un outfit</button>
+        </div>
+      </section>
+
+      <!-- PROFILO -->
+      <section class="screen" id="screen-profile" aria-labelledby="profile-title">
+        <div class="screen-head"><h1 class="display" id="profile-title">Profilo</h1></div>
+
+        <div class="card">
+          <h2 class="card-title">Su di te</h2>
+          <div class="field">
+            <span class="field-label">Sesso</span>
+            <div class="segmented" id="profile-sex" role="radiogroup" aria-label="Sesso"></div>
+          </div>
+          <div class="field">
+            <span class="field-label" id="age-label">Età</span>
+            <div class="stepper" role="group" aria-labelledby="age-label">
+              <button class="icon-btn" data-age="-1" aria-label="Meno"><i data-icon="minus" data-size="20"></i></button>
+              <input id="profile-age" type="number" inputmode="numeric" min="3" max="110" aria-labelledby="age-label">
+              <button class="icon-btn" data-age="1" aria-label="Più"><i data-icon="plus" data-size="20"></i></button>
+            </div>
+          </div>
+          <p class="hint">Servono solo per adattare stili e consigli.</p>
+        </div>
+
+        <div class="card stats">
+          <div><strong id="stat-items">0</strong><span>capi</span></div>
+          <div><strong id="stat-favs">0</strong><span>outfit salvati</span></div>
+        </div>
+
+        <div class="card">
+          <h2 class="card-title">Backup</h2>
+          <p class="hint">I tuoi dati sono solo su questo dispositivo. Salva una copia per non perderli o per spostarli su un altro telefono.</p>
+          <div class="row">
+            <button class="btn btn-tonal" id="btn-export"><i data-icon="download" data-size="20"></i>Salva copia</button>
+            <label class="btn btn-tonal"><i data-icon="upload" data-size="20"></i>Ripristina<input type="file" id="import-input" accept="application/json,.json" hidden></label>
+          </div>
+        </div>
+
+        <div class="card list">
+          <a class="list-row" href="privacy.html" id="link-privacy"><i data-icon="shield"></i><span>Privacy</span><i data-icon="next" data-size="20"></i></a>
+          <button class="list-row hidden" id="btn-demo-profile" data-action="demo"><i data-icon="sparkle"></i><span>Carica i capi di esempio</span><i data-icon="next" data-size="20"></i></button>
+          <button class="list-row danger" id="btn-wipe"><i data-icon="trash"></i><span>Cancella tutti i dati</span></button>
+        </div>
+        <p class="about">DailyOutfit <span id="app-version"></span> · Nessun account, nessun dato inviato: funziona anche offline.</p>
+      </section>
+    </main>
+
+    <button class="fab hidden" id="fab-add" data-action="add" aria-label="Aggiungi un capo"><i data-icon="plus" data-size="28"></i></button>
+
+    <nav class="tabbar" aria-label="Sezioni">
+      <button class="tab active" data-tab="today"><span class="tab-icon"><i data-icon="today"></i></span><span>Oggi</span></button>
+      <button class="tab" data-tab="wardrobe"><span class="tab-icon"><i data-icon="wardrobe"></i></span><span>Armadio</span></button>
+      <button class="tab" data-tab="favorites"><span class="tab-icon"><i data-icon="heart"></i></span><span>Preferiti</span></button>
+      <button class="tab" data-tab="profile"><span class="tab-icon"><i data-icon="user"></i></span><span>Profilo</span></button>
+    </nav>
+  </div>
+
+  <!-- Benvenuto -->
+  <div class="onboarding hidden" id="onboarding">
+    <div class="ob-step active" data-step="1">
+      <div class="ob-art" id="ob-art"></div>
+      <div class="brand brand-lg"><span class="brand-daily">Daily</span><span class="brand-outfit">Outfit</span></div>
+      <p class="ob-lead">Il tuo armadio, il tuo stile.<br>Ogni giorno l'outfit giusto.</p>
+      <ul class="ob-features">
+        <li><i data-icon="camera"></i><span>Fotografa i tuoi capi: lo sfondo sparisce da solo</span></li>
+        <li><i data-icon="today"></i><span>Scegli l'occasione: scuola, lavoro, cerimonia, pizza…</span></li>
+        <li><i data-icon="lock"></i><span>Nessun account: tutto resta sul tuo telefono</span></li>
+      </ul>
+      <button class="btn btn-primary btn-block btn-lg" data-ob="next">Inizia</button>
+    </div>
+    <div class="ob-step" data-step="2">
+      <h1 class="display">Parlaci di te</h1>
+      <p class="lead">Così adattiamo stili e consigli.</p>
+      <div class="field">
+        <span class="field-label">Sesso</span>
+        <div class="segmented" id="ob-sex" role="radiogroup" aria-label="Sesso"></div>
+      </div>
+      <div class="field">
+        <span class="field-label" id="ob-age-label">Età</span>
+        <input class="input" id="ob-age" type="number" inputmode="numeric" min="3" max="110" placeholder="es. 28" aria-labelledby="ob-age-label">
+      </div>
+      <button class="btn btn-primary btn-block btn-lg" data-ob="profile">Continua</button>
+      <button class="btn btn-text btn-block" data-ob="back">Indietro</button>
+    </div>
+    <div class="ob-step" data-step="3">
+      <h1 class="display">Come vuoi iniziare?</h1>
+      <p class="lead">Puoi sempre cambiare idea.</p>
+      <button class="choice" data-ob="photos">
+        <span class="choice-icon"><i data-icon="camera"></i></span>
+        <span><strong>Fotografa i tuoi capi</strong><small>Il modo migliore: l'app lavora con il tuo armadio vero.</small></span>
+      </button>
+      <button class="choice" data-ob="demo">
+        <span class="choice-icon"><i data-icon="sparkle"></i></span>
+        <span><strong>Prova con i capi di esempio</strong><small>Un armadio pronto per vedere subito come funziona.</small></span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Aggiungi capo -->
+  <dialog class="sheet" id="add-sheet" aria-labelledby="add-title">
+    <div class="sheet-grip"></div>
+    <h2 class="sheet-title" id="add-title">Aggiungi un capo</h2>
+    <div class="add-options">
+      <label class="add-option"><span class="choice-icon"><i data-icon="camera"></i></span><span>Scatta una foto</span>
+        <input type="file" accept="image/*" capture="environment" id="input-camera" hidden></label>
+      <label class="add-option"><span class="choice-icon"><i data-icon="gallery"></i></span><span>Scegli dalla galleria</span>
+        <input type="file" accept="image/*" multiple id="input-gallery" hidden></label>
+    </div>
+    <div class="notice notice-soft">
+      <i data-icon="bulb"></i>
+      <p>Per uno scontorno perfetto: un capo alla volta, steso o appeso su uno sfondo uniforme e di colore diverso dal capo, con buona luce.</p>
+    </div>
+  </dialog>
+
+  <!-- Scheda capo -->
+  <dialog class="fullscreen" id="item-dialog" aria-labelledby="item-title">
+    <form id="item-form" class="page" novalidate>
+      <header class="page-head">
+        <button type="button" class="icon-btn" data-item="close" aria-label="Chiudi"><i data-icon="close"></i></button>
+        <h2 id="item-title">Nuovo capo</h2>
+        <button type="button" class="icon-btn" data-item="delete" aria-label="Elimina"><i data-icon="trash"></i></button>
+      </header>
+      <div class="page-body">
+        <div class="item-preview" id="item-preview"><img alt="" id="item-preview-img"></div>
+        <div class="notice notice-warn hidden" id="cutout-warning">
+          <i data-icon="alert"></i>
+          <div><p id="cutout-warning-text"></p></div>
+        </div>
+        <div class="preview-tools">
+          <button type="button" class="btn btn-tonal btn-sm" data-item="edit-cutout"><i data-icon="scissors" data-size="18"></i><span>Modifica scontorno</span></button>
+          <div class="segmented segmented-sm" id="item-view" role="radiogroup" aria-label="Immagine da usare"></div>
+        </div>
+        <label class="switch-row">
+          <span><strong>Migliora luce e colori</strong><small>Schiarisce le foto scure e toglie le dominanti gialle</small></span>
+          <input type="checkbox" class="switch" id="item-enhance">
+        </label>
+
+        <div class="field">
+          <label class="field-label" for="item-name">Nome</label>
+          <input class="input" id="item-name" maxlength="40" placeholder="es. Camicia bianca" autocomplete="off">
+        </div>
+        <div class="field">
+          <span class="field-label">Categoria</span>
+          <div class="chips chips-wrap" id="item-category" role="radiogroup" aria-label="Categoria"></div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stile <small>(anche più di uno)</small></span>
+          <div class="chips chips-wrap" id="item-styles" aria-label="Stile"></div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stagione</span>
+          <div class="chips chips-wrap" id="item-seasons" aria-label="Stagione"></div>
+        </div>
+        <div class="field">
+          <span class="field-label">Colore principale <small id="item-color-name"></small></span>
+          <div class="swatches" id="item-colors" role="radiogroup" aria-label="Colore"></div>
+        </div>
+      </div>
+      <footer class="page-foot">
+        <span class="queue" id="item-queue"></span>
+        <button type="submit" class="btn btn-primary btn-lg">Salva</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- Editor scontorno -->
+  <dialog class="fullscreen editor" id="editor" aria-labelledby="editor-title">
+    <div class="page">
+      <header class="page-head">
+        <button type="button" class="icon-btn" data-editor="cancel" aria-label="Annulla"><i data-icon="close"></i></button>
+        <h2 id="editor-title">Scontorno</h2>
+        <div class="head-actions">
+          <button type="button" class="icon-btn" data-editor="undo" aria-label="Annulla l'ultima modifica"><i data-icon="undo"></i></button>
+          <button type="button" class="btn btn-primary btn-sm" data-editor="done">Fatto</button>
+        </div>
+      </header>
+      <div class="editor-stage" id="editor-stage">
+        <canvas id="editor-canvas"></canvas>
+        <p class="editor-hint" id="editor-hint"></p>
+        <button type="button" class="icon-btn floating" data-editor="fit" aria-label="Adatta allo schermo"><i data-icon="fit"></i></button>
+      </div>
+      <div class="editor-panel">
+        <label class="slider-row"><span id="editor-slider-label">Tolleranza colore</span><input type="range" id="editor-slider" min="4" max="40" value="12"></label>
+        <div class="editor-tools" role="toolbar" aria-label="Strumenti">
+          <button type="button" class="tool active" data-tool="wand"><i data-icon="wand"></i><span>Bacchetta</span></button>
+          <button type="button" class="tool" data-tool="erase"><i data-icon="eraser"></i><span>Gomma</span></button>
+          <button type="button" class="tool" data-tool="restore"><i data-icon="brush"></i><span>Ripristina</span></button>
+          <button type="button" class="tool" data-editor="auto"><i data-icon="scissors"></i><span>Automatico</span></button>
+          <button type="button" class="tool" data-editor="reset"><i data-icon="refresh"></i><span>Da capo</span></button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Outfit salvato -->
+  <dialog class="fullscreen" id="fav-dialog" aria-labelledby="fav-dialog-title">
+    <div class="page">
+      <header class="page-head">
+        <button type="button" class="icon-btn" data-fav="close" aria-label="Chiudi"><i data-icon="back"></i></button>
+        <h2 id="fav-dialog-title">Outfit</h2>
+        <button type="button" class="icon-btn" data-fav="delete" aria-label="Elimina"><i data-icon="trash"></i></button>
+      </header>
+      <div class="page-body">
+        <div class="collage-frame"><canvas id="fav-canvas"></canvas></div>
+        <p class="hint center" id="fav-meta"></p>
+        <button type="button" class="btn btn-primary btn-block" data-fav="share"><i data-icon="share" data-size="20"></i>Condividi</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Privacy -->
+  <dialog class="fullscreen" id="privacy-dialog" aria-labelledby="privacy-title">
+    <div class="page">
+      <header class="page-head">
+        <button type="button" class="icon-btn" data-close aria-label="Chiudi"><i data-icon="back"></i></button>
+        <h2 id="privacy-title">Privacy</h2>
+      </header>
+      <iframe class="doc-frame" title="Informativa sulla privacy" src="about:blank"></iframe>
+    </div>
+  </dialog>
+
+  <!-- Conferma -->
+  <dialog class="alert" id="ask" aria-labelledby="ask-title">
+    <h2 id="ask-title"></h2>
+    <p id="ask-message"></p>
+    <div class="alert-actions">
+      <button type="button" class="btn btn-text" id="ask-cancel">Annulla</button>
+      <button type="button" class="btn btn-primary" id="ask-ok">Conferma</button>
+    </div>
+  </dialog>
+
+  <div class="busy" id="busy" role="status" aria-live="polite"><div class="busy-box"><span class="spinner"></span><span id="busy-text">Un momento…</span></div></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/colors.js"></script>
+  <script src="js/generator.js"></script>
+  <script src="js/imaging.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/native.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/demo.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

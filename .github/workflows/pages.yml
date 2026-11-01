@@ -1,0 +1,38 @@
+# Pubblica la versione web (cartella www) su GitHub Pages.
+# Funziona solo se il repository è pubblico (o con GitHub Pro) e se in
+# Settings → Pages la sorgente è "GitHub Actions". Con il repository privato
+# il job viene saltato senza errori.
+name: Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: www
+      - id: deployment
+        uses: actions/deploy-pages@v4
