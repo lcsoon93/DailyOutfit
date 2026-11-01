@@ -2,7 +2,7 @@
 
 Fotografa i tuoi vestiti e ricevi l'outfit giusto per ogni occasione: scuola, lavoro, cerimonia, pizza con amici, appuntamento, festa, sport, tempo libero.
 
-App web e Android (Capacitor). Funziona interamente sul dispositivo: **nessun account, nessun server, nessuna intelligenza artificiale**, funziona anche offline.
+App web, Android e iOS (Capacitor). Funziona interamente sul dispositivo: **nessun account, nessun server, nessuna intelligenza artificiale**, funziona anche offline.
 
 ## Funzioni
 
@@ -34,6 +34,7 @@ www/                  l'app (è anche il sito web)
   js/demo.js          capi di esempio (vettoriali)
   privacy.html        informativa sulla privacy
 android/              progetto Android (Capacitor 8)
+ios/                  progetto iOS (Capacitor 8, iOS 16+)
 store/                materiale per la scheda del Play Store
 design/, assets/      sorgenti di icona e splash
 ```
@@ -49,4 +50,8 @@ npx cap open android   # apre Android Studio
 
 ## Pubblicazione
 
-Tutti i passaggi (versione web, chiave di firma, build dell'AAB, Play Console, test chiuso, produzione) sono in **[DEPLOY.md](DEPLOY.md)**. I testi e la grafica per lo store sono in **[store/](store/listing-it.md)**.
+Tutti i passaggi sono in **[DEPLOY.md](DEPLOY.md)**:
+
+- versione web;
+- Android: chiave di firma, build dell'AAB, Play Console, test chiuso, produzione;
+- iOS: certificato, profilo e TestFlight, senza bisogno di un Mac. I testi e la grafica per lo store sono in **[store/](store/listing-it.md)**.

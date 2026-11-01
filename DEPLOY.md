@@ -12,7 +12,9 @@ Riepilogo dei tempi: account sviluppatore e verifica (qualche giorno) → test c
 |---|---|
 | `www/` | l'app vera e propria (HTML, CSS, JS, font, icone, `privacy.html`) |
 | `android/` | progetto Android (Capacitor 8, target Android 16 / API 36) |
+| `ios/` | progetto iOS (Capacitor 8, iOS 16 o successivo) |
 | `.github/workflows/android.yml` | build automatica di APK di prova e AAB per il Play Store |
+| `.github/workflows/ios.yml` | controllo della build iOS e caricamento su TestFlight (sezione 9) |
 | `.github/workflows/pages.yml` | pubblicazione della versione web su GitHub Pages |
 | `store/` | icona 512, grafica in evidenza, screenshot e testi della scheda (`listing-it.md`) |
 | `assets/`, `design/` | sorgenti di icona e splash |
@@ -219,3 +221,117 @@ Dopo i 14 giorni, nella Dashboard compare **Richiedi l'accesso alla produzione**
 - **Nessun server da pagare**: l'app funziona interamente sul telefono, quindi non ci sono costi di gestione oltre ai 25 USD iniziali.
 - **I dati stanno sul telefono dell'utente**: se disinstalla l'app li perde, a meno che non abbia fatto «Salva copia» dal Profilo. Android può includerli nel proprio backup automatico, ma solo fino a 25 MB.
 - **Requisiti di Google che cambiano ogni anno**: in particolare il «target API level», oggi Android 16 / API 36 per le app nuove. Una volta l'anno conviene aggiornare Capacitor (`npm install @capacitor/core@latest @capacitor/cli@latest @capacitor/android@latest`, poi `npx cap sync android`) e ricompilare.
+
+---
+
+## 9. iOS e TestFlight
+
+L'app iOS è la stessa (cartella `www/`) dentro un progetto Xcode. **Non serve un Mac**: la compilano i computer macOS di GitHub, con Xcode 26, la versione che Apple richiede per i caricamenti. A ogni modifica il workflow **Actions → iOS** controlla che l'app compili. Quando lo lanci a mano, la firma e la carica su TestFlight.
+
+### 9.1 Cosa serve **(una volta)**
+
+- **Apple Developer Program**: 99 USD all'anno (in euro nella valuta locale), su developer.apple.com/programs/enroll. Il modo più rapido è l'app **Apple Developer** su iPhone, che verifica l'identità con un documento.
+  - Servono un Apple Account con verifica in due passaggi, la maggiore età e il tuo **nome legale** nell'account: soprannomi o nomi di fantasia rallentano l'approvazione.
+  - *Individuale*: sull'App Store il venditore mostrato è il tuo nome e cognome, non «Luna's studio».
+  - *Organizzazione*: serve un'attività registrata con numero D-U-N-S. Solo così il venditore può essere il nome dell'attività.
+- **«Il tuo Apple Account non è abilitato per App Store Connect»**: significa che l'iscrizione non è ancora completata o approvata, oppure che stai entrando con un Apple Account diverso da quello iscritto.
+  - Dopo l'approvazione arriva un'email di benvenuto e l'accesso si attiva, a volte con qualche ora di ritardo.
+  - Se dopo 48 ore dall'approvazione l'errore resta, scrivi al supporto (developer.apple.com/contact) indicando l'Enrollment ID.
+- **OpenSSL** per creare il certificato: è già presente su macOS e Linux. Su Windows usa «Git Bash», che si installa con Git for Windows.
+
+### 9.2 Identificativo dell'app **(una volta)**
+
+Su developer.apple.com/account apri **Certificates, IDs & Profiles → Identifiers → +** e scegli **App IDs → App**.
+
+- Descrizione: `DailyOutfit`
+- Bundle ID **Explicit**: `io.github.lcsoon93.dailyoutfit`
+- Nessuna capability aggiuntiva.
+
+### 9.3 Certificato di distribuzione **(una volta l'anno)**
+
+1. Crea la richiesta di certificato (CSR) e la sua chiave privata:
+
+   ```sh
+   openssl req -new -newkey rsa:2048 -nodes -keyout dailyoutfit-ios.key -out dailyoutfit-ios.csr -subj "/emailAddress=lucapinto045@gmail.com/CN=DailyOutfit/C=IT"
+   ```
+
+2. Vai su **Certificates → +** e scegli **Apple Distribution**. Carica `dailyoutfit-ios.csr` e scarica il certificato (`distribution.cer`).
+
+3. Converti il certificato nel formato `.p12`. L'ultimo comando chiede una password: annotala.
+
+   ```sh
+   openssl x509 -in distribution.cer -inform DER -out distribution.pem -outform PEM
+   openssl pkcs12 -export -inkey dailyoutfit-ios.key -in distribution.pem -out dailyoutfit-ios.p12 -keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg sha1
+   ```
+
+4. Conserva `dailyoutfit-ios.key`, `dailyoutfit-ios.p12` e la password in un posto sicuro, **mai nel repository**.
+
+### 9.4 Profilo di provisioning **(una volta l'anno)**
+
+1. Vai su **Profiles → +** e scegli **Distribution → App Store Connect**.
+2. Seleziona l'App ID `DailyOutfit` e il certificato appena creato.
+3. Come nome usa `DailyOutfit App Store`, poi scarica il file `.mobileprovision`.
+
+### 9.5 L'app in App Store Connect **(una volta)**
+
+Su appstoreconnect.apple.com vai in **App → + → Nuova app** e compila:
+
+- piattaforma **iOS**;
+- nome «DailyOutfit – Il tuo armadio» (deve essere unico su tutto l'App Store: se è già preso, scegline un altro);
+- lingua **Italiano**;
+- il bundle ID del punto 9.2;
+- SKU `dailyoutfit`.
+
+### 9.6 Chiave API di App Store Connect **(una volta)**
+
+1. In App Store Connect vai su **Utenti e accesso → Integrazioni → App Store Connect API → Chiavi del team**.
+2. Genera una chiave con ruolo **App Manager**.
+3. Scarica il file `.p8`: si può scaricare **una sola volta**.
+4. Annota il **Key ID** e l'**Issuer ID** che compaiono nella pagina.
+
+Il **Team ID** lo trovi su developer.apple.com/account, in **Membership details**.
+
+### 9.7 Segreti su GitHub **(una volta, poi a ogni rinnovo del certificato)**
+
+Vai su **Settings → Secrets and variables → Actions → New repository secret** e crea:
+
+| Nome | Valore |
+|---|---|
+| `APPLE_TEAM_ID` | il Team ID |
+| `IOS_DISTRIBUTION_P12_BASE64` | `dailyoutfit-ios.p12` convertito in testo |
+| `IOS_DISTRIBUTION_P12_PASSWORD` | la password del `.p12` |
+| `IOS_PROFILE_BASE64` | il file `.mobileprovision` convertito in testo |
+| `APP_STORE_CONNECT_KEY_ID` | il Key ID |
+| `APP_STORE_CONNECT_ISSUER_ID` | l'Issuer ID |
+| `APP_STORE_CONNECT_KEY_P8` | il contenuto del file `.p8` |
+
+- Per convertire i file in testo usa gli stessi comandi del punto 4.
+- Per il `.p8` aprilo con un editor di testo e copia tutto, comprese le righe `BEGIN` ed `END`.
+
+### 9.8 Caricare una build su TestFlight
+
+1. Vai su **Actions → iOS → Run workflow**, con «Firma e carica la build su TestFlight» spuntato. Se manca qualche segreto, la build si ferma e dice quale.
+2. Dopo circa 15 minuti la build è caricata. App Store Connect la elabora per altri 10-30 minuti e poi compare in **TestFlight**.
+3. Il numero di versione viene da `package.json`, quello della build dal contatore del workflow.
+
+### 9.9 Tester
+
+- **Interni** (fino a 100 persone del tuo team App Store Connect, **senza revisione**):
+  1. In TestFlight crea un gruppo interno e aggiungi te stesso.
+  2. Sull'iPhone installa l'app **TestFlight**, accetta l'invito e installa DailyOutfit.
+- **Esterni** (fino a 10.000 persone, anche con link pubblico):
+  1. Crea un gruppo esterno e aggiungi la build.
+  2. Compila le «Informazioni sui test»: descrizione, email per i feedback, link alla privacy.
+  3. Invia alla **revisione beta di Apple**, che richiede di solito un giorno o due solo per la prima build.
+- Ogni build resta disponibile **90 giorni**.
+
+### 9.10 Privacy sull'App Store
+
+In **Privacy dell'app**, alla domanda «Raccogli dati da questa app?» rispondi **No**: l'etichetta sarà «Dati non raccolti». Il link alla privacy è lo stesso usato per Android.
+
+### 9.11 Da sapere per iOS
+
+- Certificato e profilo **scadono dopo un anno**: rifai i punti 9.3 e 9.4 e aggiorna i segreti.
+- Per pubblicare sull'**App Store** (dopo TestFlight) servono la scheda con gli screenshot nel formato iPhone e la revisione di Apple.
+  - Apple può rifiutare le app che sembrano «solo un sito web». DailyOutfit funziona offline, usa la fotocamera e salva i dati sul telefono, quindi dovrebbe passare, ma conviene sottolinearlo nelle note per il revisore.
+- Se in futuro userai un Mac: `npx cap open ios` apre il progetto in Xcode. La configurazione «Release» usa la firma manuale con il profilo `DailyOutfit App Store`.
