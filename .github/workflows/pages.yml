@@ -1,7 +1,9 @@
 # Pubblica la versione web (cartella www) su GitHub Pages.
-# Funziona solo se il repository è pubblico (o con GitHub Pro) e se in
-# Settings → Pages la sorgente è "GitHub Actions". Con il repository privato
-# il job viene saltato senza errori.
+# Funziona quando in Settings → Pages la sorgente è "GitHub Actions" (e il
+# repository è pubblico, oppure con GitHub Pro). Se la sorgente è ancora
+# "Deploy from a branch", o il repository è privato, non pubblica nulla e
+# non segnala errori: in modalità branch il sito resta servito dalla radice
+# del repository, dove index.html rimanda a www/.
 name: Web
 
 on:
@@ -22,8 +24,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  check:
     if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.pages.outputs.mode }}
+    steps:
+      - id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mode=$(gh api "repos/${{ github.repository }}/pages" --jq .build_type 2>/dev/null) || mode=none
+          echo "Modalità di GitHub Pages: ${mode:-none}"
+          echo "mode=${mode:-none}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: check
+    if: ${{ needs.check.outputs.mode == 'workflow' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -53,22 +53,24 @@ L'APK di prova non serve per il Play Store, che vuole il file `.aab` (punto 5).
 
 ## 3. Pubblicare la versione web (serve per il link alla privacy)
 
-Scegli una strada:
+Il repository è **pubblico** e GitHub Pages è già attivo in modalità **«Deploy from a branch»** (main, radice). Gli indirizzi attuali sono:
 
-**A. GitHub Pages** (il repository deve essere pubblico, oppure serve GitHub Pro)
+- app: `https://lcsoon93.github.io/DailyOutfit/` (la radice rimanda a `/www/`)
+- privacy: `https://lcsoon93.github.io/DailyOutfit/www/privacy.html`, da usare nella Play Console
 
-1. **Settings → General → Danger Zone → Change visibility → Public**.
-2. **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Lancia **Actions → Web → Run workflow** (poi riparte da solo a ogni modifica di `www/`).
+**Consigliato:** in **Settings → Pages → Build and deployment → Source** scegli **GitHub Actions**, poi lancia **Actions → Web → Run workflow**. Da quel momento viene pubblicata solo la cartella `www/`, a ogni modifica, e gli indirizzi diventano più puliti:
 
-Indirizzi: `https://lcsoon93.github.io/DailyOutfit/` e `https://lcsoon93.github.io/DailyOutfit/privacy.html`.
+- app: `https://lcsoon93.github.io/DailyOutfit/`
+- privacy: `https://lcsoon93.github.io/DailyOutfit/privacy.html`
 
-**B. Repository privato: Netlify o Cloudflare Pages** (gratuiti)
+Il workflow «Web» controlla da solo la modalità: finché resta «Deploy from a branch» non pubblica nulla e non va in errore.
 
-- *Netlify*: vai su app.netlify.com/drop e trascina la cartella `www`. Oppure collega il repository con «Publish directory» `www` e nessun comando di build.
+**Se un giorno rendi privato il repository**, GitHub Pages smette di funzionare con l'account gratuito. Alternative gratuite:
+
+- *Netlify*: trascina la cartella `www` su app.netlify.com/drop, oppure collega il repository con «Publish directory» `www` e nessun comando di build.
 - *Cloudflare Pages*: collega il repository, «Build output directory» `www`, nessun comando di build.
 
-Il link alla privacy sarà `https://<nome-scelto>/privacy.html`.
+In quel caso aggiorna nella Play Console il link alla privacy.
 
 ---
 
