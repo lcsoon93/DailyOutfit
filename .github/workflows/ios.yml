@@ -1,0 +1,186 @@
+# App iOS su macOS (Xcode 26) nei server di GitHub: non serve un Mac.
+#  - A ogni modifica: controlla che l'app compili (simulatore, senza firma).
+#  - "Run workflow" con TestFlight attivo: firma con il certificato di
+#    distribuzione e carica la build su App Store Connect / TestFlight.
+#    Servono i segreti descritti in DEPLOY.md (sezione iOS).
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - 'ios/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.json'
+      - '.github/workflows/ios.yml'
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: 'Firma e carica la build su TestFlight'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Compila (simulatore, senza firma)
+    runs-on: macos-26
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installa le dipendenze
+        run: npm ci
+
+      - name: Copia l'app web nel progetto iOS
+        run: npx cap sync ios
+
+      - name: Versione di Xcode
+        run: xcodebuild -version
+
+      - name: Compila per il simulatore
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Archivia per iPhone in Release (senza firma)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/DailyOutfit.xcarchive" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO archive
+
+  testflight:
+    name: Firma e carica su TestFlight
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.testflight }}
+    needs: check
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+      IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+      IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+    steps:
+      - name: Controlla i segreti
+        run: |
+          missing=""
+          for v in APPLE_TEAM_ID IOS_DISTRIBUTION_P12_BASE64 IOS_DISTRIBUTION_P12_PASSWORD IOS_PROFILE_BASE64 \
+                   APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Mancano questi segreti per TestFlight:$missing (vedi DEPLOY.md, sezione iOS)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installa le dipendenze
+        run: npm ci
+
+      - name: Copia l'app web nel progetto iOS
+        run: npx cap sync ios
+
+      - name: Installa certificato e profilo di distribuzione
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/firma.keychain-db"
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 24)
+          echo -n "$IOS_DISTRIBUTION_P12_BASE64" | base64 --decode -o "$RUNNER_TEMP/distribuzione.p12"
+          echo -n "$IOS_PROFILE_BASE64" | base64 --decode -o "$RUNNER_TEMP/app.mobileprovision"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/distribuzione.p12" -P "$IOS_DISTRIBUTION_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+
+          security cms -D -i "$RUNNER_TEMP/app.mobileprovision" > "$RUNNER_TEMP/profilo.plist"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$RUNNER_TEMP/profilo.plist")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print Name' "$RUNNER_TEMP/profilo.plist")
+          for dir in "$HOME/Library/MobileDevice/Provisioning Profiles" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"; do
+            mkdir -p "$dir"
+            cp "$RUNNER_TEMP/app.mobileprovision" "$dir/$PROFILE_UUID.mobileprovision"
+          done
+          echo "Profilo: $PROFILE_NAME ($PROFILE_UUID)"
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+
+      - name: Usa il profilo nel progetto (solo per l'app, non per le librerie)
+        run: |
+          python3 - <<'PY'
+          import os
+          p = 'ios/App/App.xcodeproj/project.pbxproj'
+          s = open(p).read()
+          name = os.environ['PROFILE_NAME'].replace('\\', '\\\\').replace('"', '\\"')
+          old = 'PROVISIONING_PROFILE_SPECIFIER = "DailyOutfit App Store";'
+          assert old in s, 'impostazione del profilo non trovata nel progetto'
+          open(p, 'w').write(s.replace(old, f'PROVISIONING_PROFILE_SPECIFIER = "{name}";'))
+          PY
+
+      - name: Archivia e firma
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/DailyOutfit.xcarchive" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN" \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            archive
+
+      - name: Carica su App Store Connect (TestFlight)
+        run: |
+          printf '%s' "$APP_STORE_CONNECT_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+          python3 - <<'PY'
+          import os, plistlib
+          options = {
+              'method': 'app-store-connect',
+              'destination': 'upload',
+              'teamID': os.environ['APPLE_TEAM_ID'],
+              'signingStyle': 'manual',
+              'signingCertificate': 'Apple Distribution',
+              'provisioningProfiles': {'io.github.lcsoon93.dailyoutfit': os.environ['PROFILE_NAME']},
+              'manageAppVersionAndBuildNumber': False,
+              'uploadSymbols': True,
+          }
+          with open(os.path.join(os.environ['RUNNER_TEMP'], 'ExportOptions.plist'), 'wb') as f:
+              plistlib.dump(options, f)
+          PY
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/DailyOutfit.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/AuthKey.p8" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+          echo "::notice::Build ${{ github.run_number }} caricata: tra 10-30 minuti la trovi in App Store Connect → TestFlight."
+
+      - name: Pulizia
+        if: always()
+        run: |
+          [ -n "$KEYCHAIN" ] && security delete-keychain "$KEYCHAIN" || true
+          rm -f "$RUNNER_TEMP/AuthKey.p8" "$RUNNER_TEMP/distribuzione.p12" "$RUNNER_TEMP/app.mobileprovision"
