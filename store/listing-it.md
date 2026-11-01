@@ -67,7 +67,8 @@ Prima versione di DailyOutfit: armadio con scontorno automatico delle foto, outf
 
 - **Tipo**: App · **Categoria**: Stile di vita · **Gratuita**
 - **Tag** (fino a 5): Moda, Stile, Abbigliamento, Organizzazione, Lifestyle
-- **Email di contatto**: obbligatoria e pubblica (usa un indirizzo che leggi davvero)
+- **Email di contatto**: lucapinto045@gmail.com (obbligatoria e pubblica: è la stessa indicata nella privacy)
+- **Nome sviluppatore**: Luna's studio (si imposta nel profilo dell'account Play Console)
 - **Norme sulla privacy**: URL pubblico della pagina `privacy.html` (vedi `DEPLOY.md`)
 
 ## Risposte per «Configura la tua app»

@@ -21,12 +21,9 @@ L'identificativo dell'app è **`io.github.lcsoon93.dailyoutfit`**. Dopo il primo
 
 ---
 
-## 1. Prima di tutto: completa la privacy **(una volta)**
+## 1. La privacy
 
-Apri `www/privacy.html` e sostituisci:
-
-- `[NOME DELLO SVILUPPATORE]` con il tuo nome o quello della tua attività;
-- `[EMAIL DI CONTATTO]` (due volte) con l'email che userai anche nella Play Console.
+`www/privacy.html` indica come titolare **Luna's studio**, con contatto **lucapinto045@gmail.com**. Se cambi nome o email, aggiornali lì e usa gli stessi dati nella Play Console (nome sviluppatore ed email di contatto).
 
 Il Play Store chiede un **link pubblico** a questa pagina (vedi punto 3).
 
@@ -208,7 +205,7 @@ Dopo i 14 giorni, nella Dashboard compare **Richiedi l'accesso alla produzione**
 
 ## 8. Checklist prima della prima pubblicazione
 
-- [ ] Segnaposto sostituiti in `www/privacy.html` (nome ed email)
+- [x] Nome ed email del titolare inseriti in `www/privacy.html` (Luna's studio, lucapinto045@gmail.com)
 - [ ] Pagina della privacy online, con un link pubblico funzionante
 - [ ] Chiave di caricamento creata, con copia di sicurezza e segreti su GitHub
 - [ ] L'ultima build su Actions è verde e senza avviso «AAB non firmato»
