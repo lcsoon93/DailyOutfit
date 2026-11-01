@@ -50,26 +50,43 @@ L'APK di prova non serve per il Play Store, che vuole il file `.aab` (punto 5).
 
 ---
 
-## 3. Pubblicare la versione web (serve per il link alla privacy)
+## 3. La versione web (serve per il link alla privacy e per iPhone)
 
-Il repository è **pubblico** e GitHub Pages è già attivo in modalità **«Deploy from a branch»** (main, radice). Gli indirizzi attuali sono:
+Il repository è **pubblico** e GitHub Pages è attivo. Gli indirizzi sono:
 
-- app: `https://lcsoon93.github.io/DailyOutfit/` (la radice rimanda a `/www/`)
-- privacy: `https://lcsoon93.github.io/DailyOutfit/www/privacy.html`, da usare nella Play Console
+- app: `https://lcsoon93.github.io/DailyOutfit/www/` (la radice `https://lcsoon93.github.io/DailyOutfit/` rimanda qui)
+- privacy: `https://lcsoon93.github.io/DailyOutfit/www/privacy.html`, da usare nella Play Console e in App Store Connect
 
-**Consigliato:** in **Settings → Pages → Build and deployment → Source** scegli **GitHub Actions**, poi lancia **Actions → Web → Run workflow**. Da quel momento viene pubblicata solo la cartella `www/`, a ogni modifica, e gli indirizzi diventano più puliti:
+Gli indirizzi restano gli stessi in tutte e due le modalità di **Settings → Pages**:
 
-- app: `https://lcsoon93.github.io/DailyOutfit/`
-- privacy: `https://lcsoon93.github.io/DailyOutfit/privacy.html`
-
-Il workflow «Web» controlla da solo la modalità: finché resta «Deploy from a branch» non pubblica nulla e non va in errore.
+- con **Deploy from a branch** viene pubblicato tutto il repository;
+- con **GitHub Actions** il workflow «Web» pubblica solo l'app.
 
 **Se un giorno rendi privato il repository**, GitHub Pages smette di funzionare con l'account gratuito. Alternative gratuite:
 
-- *Netlify*: trascina la cartella `www` su app.netlify.com/drop, oppure collega il repository con «Publish directory» `www` e nessun comando di build.
-- *Cloudflare Pages*: collega il repository, «Build output directory» `www`, nessun comando di build.
+- *Netlify*: trascina la cartella `www` su app.netlify.com/drop.
+- *Cloudflare Pages*: collega il repository con «Build output directory» `www` e nessun comando di build.
 
-In quel caso aggiorna nella Play Console il link alla privacy.
+In quel caso cambiano gli indirizzi: aggiorna il link alla privacy negli store e reinstalla l'app sulla schermata Home dell'iPhone. Prima fai «Salva copia» dal Profilo.
+
+### Su iPhone, gratis e senza abbonamento: l'app dalla schermata Home
+
+Finché non ti iscrivi al programma Apple, tu e tua moglie potete usare DailyOutfit sui vostri iPhone come un'app vera:
+
+1. Apri `https://lcsoon93.github.io/DailyOutfit/` con **Safari**.
+2. Tocca **Condividi**, poi **Aggiungi alla schermata Home**, poi **Aggiungi**.
+3. Da quel momento aprila **sempre dall'icona**: si apre a tutto schermo e funziona anche offline.
+
+Funzionano fotocamera e galleria, scontorno, outfit e preferiti. Anche la condivisione: «Salva immagine» o invio su WhatsApp.
+
+Da sapere:
+
+- **I dati di ogni telefono restano su quel telefono.** Gli armadi tuo e di tua moglie sono separati.
+- **L'app dalla Home e Safari hanno memorie separate.** Se apri il sito in Safari invece che dall'icona, vedi un armadio vuoto. Non preoccuparti: i dati sono nell'app della Home.
+- **Se elimini l'icona dalla Home, elimini anche i suoi dati.** Fai prima «Salva copia» dal Profilo.
+- **Quando arriverà l'app da TestFlight o dall'App Store**, sarà un'app separata: per portarci l'armadio usa «Salva copia» qui e «Ripristina» nella nuova app.
+
+Le stesse istruzioni valgono per Android con Chrome («Installa app»), ma su Android c'è già l'APK.
 
 ---
 

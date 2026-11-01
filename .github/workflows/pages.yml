@@ -48,8 +48,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/configure-pages@v5
+      # stessa struttura della modalità "branch": l'app resta in /www/, così
+      # gli indirizzi (e l'app aggiunta alla schermata Home) non cambiano
+      - name: Prepara il sito
+        run: |
+          mkdir -p _site
+          cp index.html .nojekyll _site/
+          cp -R www _site/www
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: www
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -741,6 +741,17 @@
 
   Native.appVersion().then((v) => { $('#app-version').textContent = v; });
 
+  // su iPhone/iPad, nel browser, spiega come installarla dalla schermata Home
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  if (isIOS && !standalone && !Native.isNative && !Store.get('iosInstallHint', false)) {
+    $('#ios-install').classList.remove('hidden');
+  }
+  $('#btn-ios-install-ok').addEventListener('click', () => {
+    Store.set('iosInstallHint', true);
+    $('#ios-install').classList.add('hidden');
+  });
+
   load().then(() => {
     if (!state.profile) startOnboarding();
     upgradeOldItems();

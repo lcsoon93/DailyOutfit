@@ -10,7 +10,11 @@
   <meta name="description" content="Fotografa i tuoi vestiti e ricevi l'outfit giusto per ogni occasione. Tutto resta sul tuo telefono.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="DailyOutfit">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -23,6 +27,11 @@
     <main>
       <!-- OGGI -->
       <section class="screen active" id="screen-today" aria-labelledby="greeting">
+        <div class="notice notice-soft hidden" id="ios-install">
+          <i data-icon="share"></i>
+          <div><p>Per usarla come un'app su iPhone: tocca <strong>Condividi</strong> in Safari e poi <strong>Aggiungi alla schermata Home</strong>. Funziona anche offline.</p>
+            <button class="btn btn-tonal btn-sm" id="btn-ios-install-ok">Ho capito</button></div>
+        </div>
         <div class="hero">
           <h1 class="display" id="greeting">Buongiorno</h1>
           <p class="lead">Cosa ti aspetta oggi?</p>
