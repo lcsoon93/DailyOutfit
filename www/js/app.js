@@ -108,6 +108,7 @@
     const recentIds = Store.get('recent', []);
     const res = Generator.generate(state.items, {
       occasionId: state.occasion, weatherId: state.weather, profile: state.profile || {}, recentIds,
+      avoidIds: state.current ? state.current.items.map((i) => i.id) : [],
     });
     if (res.error) {
       state.current = null;
@@ -295,8 +296,8 @@
     const editBtn = itemDlg.querySelector('[data-item="edit-cutout"] span');
     if (!d.cutout && !d.noCutout) {
       warn.classList.remove('hidden');
-      $('#cutout-warning-text').textContent = 'Non sono riuscito a separare il capo dallo sfondo (forse hanno colori simili). Puoi scontornarlo a mano o tenere la foto intera.';
-      editBtn.textContent = 'Scontorna a mano';
+      $('#cutout-warning-text').textContent = 'Non sono riuscito a separare il capo dallo sfondo (sfondo a fantasia, altri oggetti o colori simili). Disegna un riquadro intorno al capo, oppure tieni la foto intera.';
+      editBtn.textContent = 'Inquadra il capo';
     } else if (d.cutout && !d.reviewed && d.cutoutConfidence < 0.35 && !d.demo) {
       warn.classList.remove('hidden');
       $('#cutout-warning-text').textContent = 'Lo sfondo era simile al capo: controlla che lo scontorno sia giusto.';
@@ -403,7 +404,8 @@
 
   async function editCutout() {
     const d = editing.draft;
-    const res = await CutoutEditor.open(d.image, d.mask);
+    const unsure = !d.mask || (!d.reviewed && d.cutoutConfidence < 0.35);
+    const res = await CutoutEditor.open(d.image, d.mask, { tool: unsure ? 'box' : undefined });
     if (!res || !editing) return;
     if (!res.mask) {
       Object.assign(d, { mask: null, cutout: null, noCutout: true, reviewed: true });

@@ -1,7 +1,30 @@
 // Motore di generazione: sceglie i capi adatti all'occasione, al meteo e al
-// profilo, prova molte combinazioni e tiene le più armoniche.
+// profilo, prova molte combinazioni e tiene le più armoniche e coerenti.
 const Generator = (() => {
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  // Livello di formalità degli stili: capi troppo distanti non stanno
+  // bene insieme (pantaloni della tuta con blazer e mocassini).
+  const FORMALITY = { sport: 0, casual: 1, smart: 2, elegant: 3 };
+  function formality(item) {
+    const lv = (item.styles && item.styles.length ? item.styles : ['casual']).map((s) => FORMALITY[s] ?? 1);
+    return [Math.min(...lv), Math.max(...lv)];
+  }
+  // distanza tra gli intervalli di formalità di due capi (0 = compatibili)
+  function gap(a, b) {
+    const [a0, a1] = formality(a), [b0, b1] = formality(b);
+    return Math.max(0, Math.max(a0, b0) - Math.min(a1, b1));
+  }
+  function coherence(outfit) {
+    let penalty = 0;
+    for (let i = 0; i < outfit.length; i++) {
+      for (let j = i + 1; j < outfit.length; j++) {
+        const g = gap(outfit[i], outfit[j]);
+        penalty += g * g; // un salto di due livelli pesa molto più di uno
+      }
+    }
+    return penalty;
+  }
 
   // Pesi degli stili adattati all'età della persona.
   function styleWeights(occasion, profile) {
@@ -85,9 +108,25 @@ const Generator = (() => {
     const { weights, recent } = ctx;
     const style = outfit.reduce((s, i) => s + styleScore(i, weights), 0) / outfit.length;
     const harmony = Colors.harmony(outfit.map((i) => i.color));
-    const repeats = outfit.filter((i) => recent.has(i.id)).length;
+    // capi messi di recente: pesano di più quelli dell'ultimo outfit
+    const repeats = outfit.reduce((s, i) => s + (recent.has(i.id) ? recent.get(i.id) : 0), 0);
     const completeness = outfit.some((i) => i.category === 'shoes') ? 0.5 : 0;
-    return { value: style * 2 + harmony.score * 1.5 - repeats * 0.8 + completeness, harmony };
+    const value = style * 2 + harmony.score * 1.5 - repeats * 0.8 + completeness - coherence(outfit) * 1.2;
+    return { value, harmony };
+  }
+
+  // Sceglie tra i migliori con probabilità proporzionale al punteggio: i
+  // migliori escono più spesso, ma "Un altro" propone davvero qualcosa di diverso.
+  function choose(candidates) {
+    const best = candidates[0].value;
+    const top = candidates.filter((c) => c.value >= best - 5).slice(0, 24);
+    const weights = top.map((c) => Math.exp((c.value - best) * 0.6));
+    let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+    for (let i = 0; i < top.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return top[i];
+    }
+    return top[0];
   }
 
   function missingNotes(p, ctx) {
@@ -104,11 +143,15 @@ const Generator = (() => {
     return notes;
   }
 
-  function generate(items, { occasionId, weatherId, profile, recentIds = [] }) {
+  // recentIds: capi degli ultimi outfit, dal più recente; avoidIds: l'outfit
+  // mostrato adesso, da non riproporre identico se c'è un'alternativa.
+  function generate(items, { occasionId, weatherId, profile, recentIds = [], avoidIds = [] }) {
     const occasion = OCCASIONS.find((o) => o.id === occasionId);
     const weather = WEATHER.find((w) => w.id === weatherId) || WEATHER[1];
     const weights = styleWeights(occasion, profile);
-    const ctx = { occasion, weather, weights, sex: profile.sex, recent: new Set(recentIds) };
+    const recent = new Map();
+    recentIds.forEach((id, k) => { if (!recent.has(id)) recent.set(id, k < 6 ? 1 : 0.5); });
+    const ctx = { occasion, weather, weights, sex: profile.sex, recent };
     const p = pools(items, weights, weather);
 
     if (!(p.top.list.length && p.bottom.list.length) && !p.onepiece.list.length) {
@@ -119,7 +162,7 @@ const Generator = (() => {
 
     const seen = new Set();
     const candidates = [];
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < 1200; i++) {
       const c = buildCandidate(p, ctx);
       if (!c) continue;
       const key = c.map((x) => x.id).sort().join('|');
@@ -127,11 +170,11 @@ const Generator = (() => {
       seen.add(key);
       candidates.push({ items: c, ...score(c, ctx) });
     }
-    candidates.sort((a, b) => b.value - a.value);
-
-    // varietà: scegli a caso tra le migliori, favorendo le prime
-    const top = candidates.slice(0, 6);
-    const chosen = top[Math.min(top.length - 1, Math.floor(Math.random() ** 2 * top.length))];
+    const avoid = avoidIds.slice().sort().join('|');
+    const fresh = candidates.filter((c) => c.items.map((x) => x.id).sort().join('|') !== avoid);
+    const pool = fresh.length ? fresh : candidates;
+    pool.sort((a, b) => b.value - a.value);
+    const chosen = choose(pool);
 
     const order = CATEGORIES.map((c) => c.id);
     chosen.items.sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category));

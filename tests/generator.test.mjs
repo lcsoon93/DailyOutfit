@@ -61,3 +61,35 @@ test('le occasioni seguono l\'età', () => {
   assert.ok(!Generator.occasionsFor({ age: 10 }).some((o) => o.id === 'work'));
   assert.ok(Generator.occasionsFor({ age: 30 }).some((o) => o.id === 'work'));
 });
+
+test('niente capi di formalità lontanissime insieme (tuta con mocassini o blazer)', () => {
+  const mixed = [...wardrobe, item('hoodie', 'top', ['sport'], '#7a7d82')];
+  const sportOnly = (x) => x.styles.every((st) => st === 'sport');
+  const formalOnly = (x) => x.styles.every((st) => st === 'smart' || st === 'elegant');
+  let prev = [];
+  for (let i = 0; i < 400; i++) {
+    const res = Generator.generate(mixed, { occasionId: 'pizza', weatherId: 'mild', profile, recentIds: prev });
+    assert.ok(!(res.items.some(sportOnly) && res.items.some(formalOnly)), res.items.map((x) => x.id).join(','));
+    prev = res.items.map((x) => x.id);
+  }
+});
+
+test('«Un altro» non ripropone lo stesso outfit', () => {
+  let prev = run('pizza').items.map((x) => x.id);
+  for (let i = 0; i < 40; i++) {
+    const next = Generator.generate(wardrobe, { occasionId: 'pizza', weatherId: 'mild', profile, recentIds: prev, avoidIds: prev }).items.map((x) => x.id);
+    assert.notDeepEqual([...next].sort(), [...prev].sort());
+    prev = next;
+  }
+});
+
+test('outfit vari: richieste ripetute danno più combinazioni', () => {
+  const seen = new Set();
+  let recent = [];
+  for (let i = 0; i < 20; i++) {
+    const ids = Generator.generate(wardrobe, { occasionId: 'weekend', weatherId: 'mild', profile, recentIds: recent }).items.map((x) => x.id);
+    seen.add([...ids].sort().join('|'));
+    recent = [...ids, ...recent].slice(0, 12);
+  }
+  assert.ok(seen.size >= 3, `solo ${seen.size} combinazioni`);
+});

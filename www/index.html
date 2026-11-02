@@ -280,12 +280,13 @@
         <button type="button" class="icon-btn floating" data-editor="fit" aria-label="Adatta allo schermo"><i data-icon="fit"></i></button>
       </div>
       <div class="editor-panel">
-        <label class="slider-row"><span id="editor-slider-label">Tolleranza colore</span><input type="range" id="editor-slider" min="4" max="40" value="12"></label>
+        <label class="slider-row" id="editor-slider-row"><span id="editor-slider-label">Tolleranza colore</span><input type="range" id="editor-slider" min="4" max="40" value="12"></label>
         <div class="editor-tools" role="toolbar" aria-label="Strumenti">
+          <button type="button" class="tool" data-tool="box"><i data-icon="crop"></i><span>Riquadro</span></button>
           <button type="button" class="tool active" data-tool="wand"><i data-icon="wand"></i><span>Bacchetta</span></button>
           <button type="button" class="tool" data-tool="erase"><i data-icon="eraser"></i><span>Gomma</span></button>
           <button type="button" class="tool" data-tool="restore"><i data-icon="brush"></i><span>Ripristina</span></button>
-          <button type="button" class="tool" data-editor="auto"><i data-icon="scissors"></i><span>Automatico</span></button>
+          <button type="button" class="tool" data-editor="auto"><i data-icon="scissors"></i><span>Auto</span></button>
           <button type="button" class="tool" data-editor="reset"><i data-icon="refresh"></i><span>Da capo</span></button>
         </div>
       </div>
@@ -337,6 +338,7 @@
   <script src="js/data.js"></script>
   <script src="js/colors.js"></script>
   <script src="js/generator.js"></script>
+  <script src="js/segment.js"></script>
   <script src="js/imaging.js"></script>
   <script src="js/render.js"></script>
   <script src="js/native.js"></script>

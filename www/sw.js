@@ -1,11 +1,11 @@
 // Service worker per la versione web: tiene in cache i file dell'app così
 // funziona anche offline. Nelle app Android e iOS non viene registrato.
-const CACHE = 'dailyoutfit-v3';
+const CACHE = 'dailyoutfit-v4';
 const FILES = [
   './', 'index.html', 'privacy.html', 'manifest.webmanifest', 'css/app.css',
   'fonts/dm-sans-latin.woff2', 'fonts/fraunces-latin.woff2', 'fonts/fraunces-italic-latin.woff2',
   'icons/favicon.svg', 'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png',
-  'js/icons.js', 'js/db.js', 'js/data.js', 'js/colors.js', 'js/generator.js', 'js/imaging.js',
+  'js/icons.js', 'js/db.js', 'js/data.js', 'js/colors.js', 'js/generator.js', 'js/segment.js', 'js/segment-worker.js', 'js/imaging.js',
   'js/render.js', 'js/native.js', 'js/ui.js', 'js/editor.js', 'js/demo.js', 'js/backup.js', 'js/app.js',
 ];
 

@@ -1,5 +1,6 @@
-// Editor dello scontorno: si corregge a mano con la bacchetta (tocca lo
-// sfondo e sparisce tutta l'area di colore simile), la gomma e il pennello
+// Editor dello scontorno: si corregge a mano con il riquadro (si inquadra il
+// capo e il resto della foto sparisce), la bacchetta (tocca lo sfondo e
+// sparisce tutta l'area di colore simile), la gomma e il pennello
 // "ripristina". Si zooma pizzicando e ci si sposta trascinando.
 const CutoutEditor = (() => {
   const $ = UI.$;
@@ -10,8 +11,10 @@ const CutoutEditor = (() => {
   const slider = $('#editor-slider');
   const sliderLabel = $('#editor-slider-label');
   const hint = $('#editor-hint');
+  const sliderRow = $('#editor-slider-row');
 
   const HINTS = {
+    box: 'Trascina un riquadro intorno al capo: tutto quello che sta fuori sparisce. Due dita per spostarti.',
     wand: 'Tocca lo sfondo per toglierlo. Trascina per spostarti, pizzica per ingrandire.',
     erase: 'Passa il dito sulle parti da togliere. Due dita per spostarti.',
     restore: 'Passa il dito sulle parti del capo da rimettere. Due dita per spostarti.',
@@ -62,7 +65,8 @@ const CutoutEditor = (() => {
       vctx.drawImage(st.ghost, 0, 0); // le parti tolte restano visibili, sbiadite e colorate
       vctx.globalAlpha = 1;
       vctx.drawImage(st.fg, 0, 0);
-      if (st.cursor && settings.tool !== 'wand') {
+      if (st.box) drawBox(st.box);
+      if (st.cursor && (settings.tool === 'erase' || settings.tool === 'restore')) {
         vctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         vctx.beginPath();
         vctx.arc(st.cursor.sx, st.cursor.sy, settings.brush / 2, 0, Math.PI * 2);
@@ -74,6 +78,23 @@ const CutoutEditor = (() => {
         vctx.stroke();
       }
     });
+  }
+
+  // riquadro in corso: fuori è scurito, il bordo è tratteggiato
+  function drawBox(r) {
+    const { dpr } = st;
+    const x = st.tx + r.x * st.s, y = st.ty + r.y * st.s, w = r.w * st.s, h = r.h * st.s;
+    vctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    vctx.beginPath();
+    vctx.rect(0, 0, st.vw, st.vh);
+    vctx.rect(x, y, w, h);
+    vctx.fillStyle = 'rgba(20, 17, 15, .55)';
+    vctx.fill('evenodd');
+    vctx.setLineDash([8, 6]);
+    vctx.lineWidth = 2;
+    vctx.strokeStyle = '#fff';
+    vctx.strokeRect(x, y, w, h);
+    vctx.setLineDash([]);
   }
 
   function resizeView() {
@@ -142,10 +163,11 @@ const CutoutEditor = (() => {
   function setTool(tool) {
     settings.tool = tool;
     dlg.querySelectorAll('[data-tool]').forEach((b) => b.classList.toggle('active', b.dataset.tool === tool));
+    sliderRow.classList.toggle('off', tool === 'box');
     if (tool === 'wand') {
       sliderLabel.textContent = 'Tolleranza colore';
       slider.min = 4; slider.max = 40; slider.value = settings.tol;
-    } else {
+    } else if (tool !== 'box') {
       sliderLabel.textContent = 'Dimensione pennello';
       slider.min = 8; slider.max = 90; slider.value = settings.brush;
     }
@@ -198,6 +220,52 @@ const CutoutEditor = (() => {
     redraw({ fg: true });
   }
 
+  function boxFrom(a, b) {
+    const w = st.img.width, h = st.img.height;
+    const cl = (v, max) => Math.max(0, Math.min(max, v));
+    const x0 = cl(Math.min(a.x, b.x), w), x1 = cl(Math.max(a.x, b.x), w);
+    const y0 = cl(Math.min(a.y, b.y), h), y1 = cl(Math.max(a.y, b.y), h);
+    return { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) };
+  }
+
+  // Cerca il capo solo dentro il riquadro; se non trova un contorno chiaro
+  // tiene il riquadro intero (meglio un ritaglio pulito della foto intera).
+  async function applyBox(r) {
+    const w = st.img.width, h = st.img.height;
+    if (r.w < w * 0.08 || r.h < h * 0.08) {
+      UI.toast('Riquadro troppo piccolo: trascina il dito intorno a tutto il capo.');
+      return;
+    }
+    UI.busy(true, 'Cerco il capo nel riquadro…');
+    let res = null;
+    try {
+      res = await Imaging.autoMask(st.src, r);
+    } catch {
+      res = null;
+    } finally {
+      UI.busy(false);
+    }
+    if (!st) return;
+    // un contorno che copre poco del riquadro (o quasi tutto) non è il capo
+    const good = res && res.confidence >= 0.12 && res.share >= 0.2 && res.share <= 0.97;
+    pushHistory();
+    const ctx = Imaging.ctxOf(st.mask);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, w, h);
+    if (good) {
+      ctx.drawImage(res.mask, 0, 0);
+    } else {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+    }
+    ctx.restore();
+    redraw({ fg: true });
+    UI.toast(good
+      ? 'Ho tolto lo sfondo nel riquadro. Ritocca con gomma o bacchetta se serve.'
+      : 'Ho tenuto solo il riquadro. Se vuoi, rifinisci i bordi con la gomma.');
+  }
+
   async function auto() {
     UI.busy(true, 'Cerco lo sfondo…');
     try {
@@ -245,6 +313,8 @@ const CutoutEditor = (() => {
         updateUndo();
         st.stroke = null;
       }
+      st.box = null;
+      st.boxStart = null;
       const [a, b] = [...st.pointers.values()];
       st.pinch = { d: Math.hypot(a.sx - b.sx, a.sy - b.sy), mx: (a.sx + b.sx) / 2, my: (a.sy + b.sy) / 2, s: st.s, tx: st.tx, ty: st.ty };
       st.gesture = true;
@@ -252,7 +322,10 @@ const CutoutEditor = (() => {
     }
     if (st.pointers.size > 2) return;
     st.down = { ...p, moved: false, tx: st.tx, ty: st.ty };
-    if (settings.tool !== 'wand') {
+    if (settings.tool === 'box') {
+      st.boxStart = toImage(p);
+      st.box = null;
+    } else if (settings.tool !== 'wand') {
       pushHistory();
       const ip = toImage(p);
       st.stroke = { last: ip };
@@ -285,7 +358,12 @@ const CutoutEditor = (() => {
     }
     if (!st.down || st.gesture) return;
     if (Math.hypot(p.sx - st.down.sx, p.sy - st.down.sy) > 6) st.down.moved = true;
-    if (st.stroke) {
+    if (st.boxStart) {
+      if (st.down.moved) {
+        st.box = boxFrom(st.boxStart, toImage(p));
+        redraw();
+      }
+    } else if (st.stroke) {
       const ip = toImage(p);
       paint(st.stroke.last, ip);
       st.stroke.last = ip;
@@ -304,6 +382,13 @@ const CutoutEditor = (() => {
     if (st.pointers.size < 2) st.pinch = null;
     if (st.pointers.size) return;
     if (settings.tool === 'wand' && st.down && !st.down.moved && !st.gesture && e.type === 'pointerup') wand(toImage(p));
+    const box = st.box;
+    st.box = null;
+    st.boxStart = null;
+    if (settings.tool === 'box' && e.type === 'pointerup' && !st.gesture) {
+      if (box) applyBox(box);
+      else UI.toast('Trascina il dito in diagonale per disegnare il riquadro intorno al capo.');
+    }
     st.down = null;
     st.stroke = null;
     st.gesture = false;
@@ -372,9 +457,10 @@ const CutoutEditor = (() => {
   }
 
   // Apre l'editor sulla foto (e sulla maschera di partenza, se c'è).
+  // tool: strumento iniziale (di solito «box» quando lo scontorno è fallito).
   // Restituisce { mask } (dataURL PNG o null = nessuno scontorno) oppure
   // null se l'utente annulla.
-  async function open(src, maskSrc) {
+  async function open(src, maskSrc, { tool } = {}) {
     const im = await Imaging.loadImage(src);
     const img = Imaging.drawScaled(im, Imaging.STORE_MAX);
     const w = img.width, h = img.height;
@@ -399,7 +485,7 @@ const CutoutEditor = (() => {
     };
     refreshFg();
     UI.open(dlg, { onBack: cancel });
-    setTool(settings.tool);
+    setTool(tool || (settings.tool === 'box' ? 'wand' : settings.tool));
     updateUndo();
     return new Promise((resolve) => {
       st.resolve = resolve;

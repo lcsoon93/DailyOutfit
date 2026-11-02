@@ -35,7 +35,7 @@ Fotografa i tuoi capi uno alla volta: lo sfondo viene tolto in automatico e il c
 
 COME FUNZIONA
 • Fotografa o scegli dalla galleria i tuoi capi
-• Lo sfondo sparisce da solo; se serve, lo ritocchi con un dito (bacchetta, gomma e pennello)
+• Lo sfondo sparisce da solo; se serve, inquadri il capo con un riquadro o lo ritocchi con un dito (bacchetta, gomma e pennello)
 • Indica categoria, stile e stagione con pochi tocchi
 • Scegli occasione e meteo e premi «Crea il mio outfit»
 • Non ti convince? «Un altro» e ne ricevi subito uno nuovo
